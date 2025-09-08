@@ -16,6 +16,7 @@ import Modal from 'react-native-modal';
 // Axeptio Configuration
 const PROJECT_ID = '67fcdb2b52ab9a99a5865f4d';
 const API_BASE = 'https://staging-api.axeptio.tech/mobile';
+const TEST_API_TOKEN = 'project_test-standard-001_pro_token'; // Test token from headless-cmp fixtures
 
 // Mock vendors since project config is empty
 const VENDORS = {
@@ -87,7 +88,8 @@ export default function App() {
           method: 'POST',
           headers: { 
             'Content-Type': 'application/json',
-            'Accept': 'application/json'
+            'Accept': 'application/json',
+            'Authorization': `Bearer ${TEST_API_TOKEN}`
           },
           body: JSON.stringify(consent)
         }
@@ -130,7 +132,8 @@ export default function App() {
         `${API_BASE}/consents/${PROJECT_ID}?token=demo_user`,
         {
           headers: {
-            'Accept': 'application/json'
+            'Accept': 'application/json',
+            'Authorization': `Bearer ${TEST_API_TOKEN}`
           }
         }
       );
