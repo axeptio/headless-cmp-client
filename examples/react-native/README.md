@@ -2,17 +2,17 @@
 
 A minimal demonstration of a custom consent widget using Axeptio's Headless CMP API.
 
-## 🎯 Overview
+## Overview
 
 This example demonstrates how to build a custom consent management interface in React Native that integrates with Axeptio's headless API. It showcases:
 
-- 🎨 Custom consent modal UI
-- 🔌 Direct API integration with Axeptio staging environment  
-- 🍪 Vendor preference management with toggles
-- 📡 Real-time consent submission
-- 🔍 Consent status checking
+- Custom consent modal UI
+- Direct API integration with Axeptio staging environment  
+- Vendor preference management with toggles
+- Real-time consent submission
+- Consent status checking
 
-## 🚀 Quick Start
+## Quick Start
 
 ### Prerequisites
 - Node.js 16+ and npm/yarn
@@ -49,7 +49,7 @@ npm run android
 npm run web
 ```
 
-## 🏗️ Architecture
+## Architecture
 
 ### Single File Implementation
 The entire demo is contained in `App.js` (~350 lines) for simplicity:
@@ -80,7 +80,7 @@ POST /mobile/consents/{projectId}/cookies/default
 GET /mobile/consents/{projectId}?token=demo_user
 ```
 
-## 📋 Features
+## Features
 
 ### Vendor Management
 The demo includes 3 mock vendors (since the project config is empty):
@@ -95,12 +95,12 @@ The demo includes 3 mock vendors (since the project config is empty):
 4. **Save Preferences** - Saves custom vendor selections
 
 ### Visual Feedback
-- ✅ Success alerts for saved consent
-- ⚠️ API response details
-- 📊 Current consent status display
+- Success alerts for saved consent
+- API response details
+- Current consent status display
 - Loading indicators during API calls
 
-## 🔧 Configuration
+## Configuration
 
 The app uses these hardcoded values (see `App.js`):
 
@@ -109,7 +109,7 @@ const PROJECT_ID = '67fcdb2b52ab9a99a5865f4d';
 const API_BASE = 'https://staging-api.axeptio.tech/mobile';
 ```
 
-## 📝 API Endpoints Used
+## API Endpoints Used
 
 | Endpoint | Method | Purpose |
 |----------|--------|---------|
@@ -137,7 +137,7 @@ const API_BASE = 'https://staging-api.axeptio.tech/mobile';
 }
 ```
 
-## 🎨 Customization
+## Customization
 
 ### Styling
 All styles are in the `StyleSheet` at the bottom of `App.js`. Key colors:
@@ -157,7 +157,7 @@ const VENDORS = {
 };
 ```
 
-## 🧪 Testing
+## Testing
 
 ### Manual Testing Checklist
 - [ ] Modal opens and closes properly
@@ -175,7 +175,7 @@ The app displays full API responses in alerts for debugging:
 - Response body (JSON)
 - Error messages
 
-## 🚢 Production Considerations
+## Production Considerations
 
 This is a **demo implementation**. For production, consider:
 
@@ -188,7 +188,7 @@ This is a **demo implementation**. For production, consider:
 7. **Accessibility** - Screen reader support
 8. **Testing** - Unit and integration tests
 
-## 📦 Dependencies
+## Dependencies
 
 ```json
 {
