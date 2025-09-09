@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   View,
   Text,
@@ -16,7 +16,7 @@ import Modal from 'react-native-modal';
 // Axeptio Configuration
 const PROJECT_ID = '67fcdb2b52ab9a99a5865f4d';
 const API_BASE = 'https://staging-api.axeptio.tech/mobile';
-const TEST_API_TOKEN = 'project_test-standard-001_pro_token'; // Test token from headless-cmp fixtures
+const TEST_API_TOKEN = 'project_67fcdb2b52ab9a99a5865f4d_test_token'; // Authorized token for this project
 
 // Mock vendors since project config is empty
 const VENDORS = {
@@ -35,6 +35,12 @@ export default function App() {
   });
   const [consentStatus, setConsentStatus] = useState('Not Set');
   const [lastConsentId, setLastConsentId] = useState(null);
+  const [configId, setConfigId] = useState(null);
+
+  // Fetch configuration on mount
+  useEffect(() => {
+    fetchConfiguration();
+  }, []);
 
   // Toggle individual vendor
   const toggleVendor = (vendorKey) => {
@@ -66,24 +72,32 @@ export default function App() {
   const submitConsent = async (isAcceptAll) => {
     setLoading(true);
     
-    const consent = {
-      accept: isAcceptAll || Object.values(vendors).some(v => v),
-      preferences: {
-        vendors: isAcceptAll ? 
-          Object.keys(VENDORS).reduce((acc, v) => ({...acc, [v]: true}), {}) :
-          vendors
-      },
-      token: `demo_user_${Date.now()}`,
-      metadata: {
-        platform: 'react-native',
-        appVersion: '1.0.0',
-        timestamp: new Date().toISOString()
+    // Ensure we have a configId
+    let currentConfigId = configId;
+    if (!currentConfigId) {
+      currentConfigId = await fetchConfiguration();
+      if (!currentConfigId) {
+        Alert.alert('❌ Error', 'Could not fetch configuration. Please try again.');
+        setLoading(false);
+        return;
       }
+    }
+    
+    const consent = {
+      accept: true,
+      preferences: {
+        vendors: {
+          google_analytics: isAcceptAll || vendors.google_analytics,
+          facebook_pixel: isAcceptAll || vendors.facebook_pixel,
+          mixpanel: isAcceptAll || vendors.mixpanel
+        }
+      },
+      token: `mobile_user_${Date.now()}`
     };
 
     try {
       const response = await fetch(
-        `${API_BASE}/consents/${PROJECT_ID}/cookies/default`,
+        `${API_BASE}/consents/${PROJECT_ID}/cookies/${currentConfigId}`,
         {
           method: 'POST',
           headers: { 
@@ -124,12 +138,38 @@ export default function App() {
     }
   };
 
-  // Check consent status
-  const checkStatus = async () => {
+  // Fetch configuration to get configId
+  const fetchConfiguration = async () => {
+    try {
+      const response = await fetch(
+        `${API_BASE}/configurations/${PROJECT_ID}`,
+        {
+          headers: {
+            'Accept': 'application/json',
+            'Authorization': `Bearer ${TEST_API_TOKEN}`
+          }
+        }
+      );
+      
+      if (response.ok) {
+        const data = await response.json();
+        if (data.defaultConfigId) {
+          setConfigId(data.defaultConfigId);
+          return data.defaultConfigId;
+        }
+      }
+    } catch (error) {
+      console.error('Failed to fetch configuration:', error);
+    }
+    return null;
+  };
+
+  // Check auth status
+  const checkAuth = async () => {
     setLoading(true);
     try {
       const response = await fetch(
-        `${API_BASE}/consents/${PROJECT_ID}?token=demo_user`,
+        `${API_BASE}/auth/me`,
         {
           headers: {
             'Accept': 'application/json',
@@ -141,19 +181,19 @@ export default function App() {
       if (response.ok) {
         const data = await response.json();
         Alert.alert(
-          '📊 Consent Status',
-          JSON.stringify(data, null, 2),
+          '✅ Auth Status',
+          `Project: ${data.projectId}\nTier: ${data.tier}\nAuthorized: ${data.authorized}`,
           [{ text: 'OK' }]
         );
       } else {
         const errorText = await response.text();
         Alert.alert(
-          'ℹ️ Status Check',
-          `No consent found or API returned:\n\nStatus: ${response.status}\n${errorText}`
+          '❌ Auth Failed',
+          `Status: ${response.status}\n${errorText}`
         );
       }
     } catch (error) {
-      Alert.alert('❌ Error', `Could not check status:\n\n${error.message}`);
+      Alert.alert('❌ Error', `Could not check auth:\n\n${error.message}`);
     } finally {
       setLoading(false);
     }
@@ -192,10 +232,10 @@ export default function App() {
 
         <TouchableOpacity 
           style={styles.secondaryButton} 
-          onPress={checkStatus}
+          onPress={checkAuth}
           disabled={loading}
         >
-          <Text style={styles.secondaryButtonText}>🔍 Check Status</Text>
+          <Text style={styles.secondaryButtonText}>🔐 Check Auth</Text>
         </TouchableOpacity>
       </View>
 
