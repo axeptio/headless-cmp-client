@@ -194,8 +194,12 @@ This is a **demo implementation**. For production, consider:
 {
   "expo": "~49.0.0",
   "react": "18.2.0",
-  "react-native": "0.72.0",
-  "react-native-modal": "^13.0.0"
+  "react-native": "0.72.10",
+  "react-native-modal": "^13.0.1"
 }
 ```
+
+### Security Note
+
+This demo uses Expo SDK 49 which has known vulnerabilities in its dependencies (semver, send). These are internal to Expo and would require upgrading to Expo SDK 53+ to resolve, which involves breaking changes. For production use, consider upgrading to the latest Expo SDK.
 
