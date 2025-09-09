@@ -83,10 +83,6 @@ The client SDKs interact with these primary endpoints:
 
 ## Development
 
-### Contributing
-
-We welcome contributions. Please see [CONTRIBUTING.md](./CONTRIBUTING.md) for guidelines.
-
 ### Building from Source
 
 ```bash
