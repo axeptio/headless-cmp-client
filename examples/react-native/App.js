@@ -126,11 +126,19 @@ export default function App() {
       }
 
       if (response.ok || response.status === 201) {
+        // Try to find the consent ID in various possible fields
+        const consentId = parsedData.id ||
+                         parsedData._id ||
+                         parsedData.consentId ||
+                         parsedData.uuid ||
+                         parsedData.insertedId ||
+                         'saved';
+
         setConsentStatus(isAcceptAll ? '✅ All Accepted' : '⚙️ Custom Preferences');
-        setLastConsentId(parsedData.id || 'saved');
+        setLastConsentId(consentId);
         Alert.alert(
-          '✅ Success', 
-          `Consent saved successfully!\n\nStatus: ${response.status}\nID: ${parsedData.id || 'N/A'}`
+          '✅ Success',
+          `Consent saved successfully!\n\nStatus: ${response.status}\nID: ${consentId === 'saved' ? 'N/A' : consentId}`
         );
       } else {
         Alert.alert(
@@ -203,26 +211,11 @@ export default function App() {
             };
             vendorPreferences[vendorKey] = false; // Default to not accepted
 
-            // Log vendor image data for debugging
-            console.log(`Vendor: ${vendor.title || vendor.name}`);
-            console.log(`  Full image object:`, JSON.stringify(vendor.image, null, 2));
-            if (vendor.image?.optimized) {
-              console.log(`  Small: ${vendor.image.optimized.small}`);
-              console.log(`  Medium: ${vendor.image.optimized.medium}`);
-              console.log(`  Large: ${vendor.image.optimized.large}`);
-            }
-            if (vendor.image?.fallbackUrl) {
-              console.log(`  Fallback: ${vendor.image.fallbackUrl}`);
-            }
           });
 
           setApiVendors(vendorMap);
           setVendors(vendorPreferences);
           console.log(`Successfully loaded ${vendorData.vendors.length} vendors from API`);
-
-          // Test if Image component works at all with a known good URL
-          console.log('🧪 Testing Image component with known good URL...');
-
           setVendorsLoading(false);
           return vendorMap;
         }
@@ -289,14 +282,6 @@ export default function App() {
       <View style={styles.header}>
         <Text style={styles.title}>🛡️ Axeptio React Native Demo</Text>
         <Text style={styles.subtitle}>Headless CMP Widget Example</Text>
-
-        {/* Test image to verify Image component works */}
-        <Image
-          source={{ uri: 'https://via.placeholder.com/32x32/32C832/ffffff?text=✓' }}
-          style={{ width: 32, height: 32, marginTop: 8 }}
-          onLoad={() => console.log('🧪✅ Test image loaded successfully')}
-          onError={(error) => console.log('🧪❌ Test image failed:', error.nativeEvent?.error)}
-        />
       </View>
 
       <View style={styles.statusCard}>
@@ -381,25 +366,7 @@ export default function App() {
                                vendor.image?.fallbackUrl
                         }}
                         style={styles.vendorLogo}
-                        onLoad={(event) => {
-                          const usedUrl = vendor.image?.optimized?.small ||
-                                         vendor.image?.optimized?.medium ||
-                                         vendor.image?.fallbackUrl;
-                          console.log(`✅ Successfully loaded image for ${vendor.name}: ${usedUrl}`);
-                        }}
-                        onError={(error) => {
-                          const attemptedUrl = vendor.image?.optimized?.small ||
-                                              vendor.image?.optimized?.medium ||
-                                              vendor.image?.fallbackUrl;
-                          console.log(`❌ Failed to load image for ${vendor.name}`);
-                          console.log(`   Attempted URL: ${attemptedUrl}`);
-                          console.log(`   Error:`, error.nativeEvent?.error || 'Unknown error');
-                          console.log(`   Available image options:`, {
-                            small: vendor.image?.optimized?.small,
-                            medium: vendor.image?.optimized?.medium,
-                            large: vendor.image?.optimized?.large,
-                            fallback: vendor.image?.fallbackUrl
-                          });
+                        onError={() => {
                           // Mark this vendor's image as failed to avoid repeated attempts
                           setFailedImages(prev => new Set([...prev, key]));
                         }}
