@@ -36,6 +36,7 @@ export default function App() {
   const [failedImages, setFailedImages] = useState(new Set()); // Track failed image loads
   const [consentStatus, setConsentStatus] = useState('Not Set');
   const [lastConsentId, setLastConsentId] = useState(null);
+  const [lastConsentToken, setLastConsentToken] = useState(null); // Store last used token
   const [configId, setConfigId] = useState(null);
 
   // Fetch configuration and vendors on mount
@@ -95,13 +96,18 @@ export default function App() {
       vendorPreferences[vendorKey] = isAcceptAll || vendors[vendorKey] || false;
     });
 
+    const consentToken = `mobile_user_${Date.now()}`;
     const consent = {
       accept: true,
       preferences: {
         vendors: vendorPreferences
       },
-      token: `mobile_user_${Date.now()}`
+      token: consentToken
     };
+
+    // Store the token for later consent reading
+    setLastConsentToken(consentToken);
+    console.log('Generated consent token:', consentToken);
 
     try {
       const response = await fetch(
@@ -138,7 +144,7 @@ export default function App() {
         setLastConsentId(consentId);
         Alert.alert(
           '✅ Success',
-          `Consent saved successfully!\n\nStatus: ${response.status}\nID: ${consentId === 'saved' ? 'N/A' : consentId}`
+          `Consent saved successfully!\n\nStatus: ${response.status}\nID: ${consentId === 'saved' ? 'N/A' : consentId}\nToken: ${consentToken}`
         );
       } else {
         Alert.alert(
@@ -255,7 +261,7 @@ export default function App() {
           }
         }
       );
-      
+
       if (response.ok) {
         const data = await response.json();
         Alert.alert(
@@ -272,6 +278,73 @@ export default function App() {
       }
     } catch (error) {
       Alert.alert('❌ Error', `Could not check auth:\n\n${error.message}`);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Check existing consent status
+  const checkConsentStatus = async () => {
+    if (!lastConsentToken) {
+      Alert.alert(
+        '📋 No Token Available',
+        'No consent has been submitted yet. Please submit a consent first to check its status.',
+        [{ text: 'OK' }]
+      );
+      return;
+    }
+
+    setLoading(true);
+    console.log('Reading consent with token:', lastConsentToken);
+    try {
+      // Use the correct API endpoint format: /mobile/client/{projectId}/consents/{token}
+      const response = await fetch(
+        `${API_BASE}/client/${PROJECT_ID}/consents/${lastConsentToken}`,
+        {
+          headers: {
+            'Accept': 'application/json',
+            'Authorization': `Bearer ${TEST_API_TOKEN}`
+          }
+        }
+      );
+
+      if (response.ok) {
+        const data = await response.json();
+        console.log('Consent API Response:', JSON.stringify(data, null, 2));
+
+        if (data && typeof data === 'object' && Object.keys(data).length > 0) {
+          const vendorCount = Object.keys(data.preferences?.vendors || {}).length;
+          const acceptedVendors = Object.values(data.preferences?.vendors || {}).filter(Boolean).length;
+
+          const consentInfo = `Consent Found!\n\nAccepted: ${data.accept ? 'Yes' : 'No'}\nTotal Vendors: ${vendorCount}\nAccepted Vendors: ${acceptedVendors}\nToken: ${lastConsentToken}\nTimestamp: ${data.createdAt || data.timestamp || 'Unknown'}\nID: ${data.id || data._id || 'Unknown'}`;
+
+          Alert.alert(
+            '📋 Consent Status',
+            consentInfo,
+            [{ text: 'OK' }]
+          );
+        } else {
+          Alert.alert(
+            '📋 No Consent Found',
+            'No existing consent found for this token.',
+            [{ text: 'OK' }]
+          );
+        }
+      } else if (response.status === 404) {
+        Alert.alert(
+          '📋 No Consent Found',
+          `No existing consent found for token: ${lastConsentToken}`,
+          [{ text: 'OK' }]
+        );
+      } else {
+        const errorText = await response.text();
+        Alert.alert(
+          '❌ Error',
+          `Status: ${response.status}\n${errorText}`
+        );
+      }
+    } catch (error) {
+      Alert.alert('❌ Error', `Could not check consent status:\n\n${error.message}`);
     } finally {
       setLoading(false);
     }
@@ -301,16 +374,24 @@ export default function App() {
       </View>
 
       <View style={styles.buttonContainer}>
-        <TouchableOpacity 
-          style={styles.primaryButton} 
+        <TouchableOpacity
+          style={styles.primaryButton}
           onPress={() => setModalVisible(true)}
           disabled={loading}
         >
           <Text style={styles.primaryButtonText}>⚙️ Manage Consent</Text>
         </TouchableOpacity>
 
-        <TouchableOpacity 
-          style={styles.secondaryButton} 
+        <TouchableOpacity
+          style={styles.secondaryButton}
+          onPress={checkConsentStatus}
+          disabled={loading}
+        >
+          <Text style={styles.secondaryButtonText}>📋 Check Consent Status</Text>
+        </TouchableOpacity>
+
+        <TouchableOpacity
+          style={styles.secondaryButton}
           onPress={checkAuth}
           disabled={loading}
         >
