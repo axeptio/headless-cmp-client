@@ -310,6 +310,7 @@ export default function App() {
       <View style={styles.infoCard}>
         <Text style={styles.infoTitle}>📡 API Configuration</Text>
         <Text style={styles.infoText}>Project ID: {PROJECT_ID}</Text>
+        <Text style={styles.infoText}>Config ID: {configId || 'Loading...'}</Text>
         <Text style={styles.infoText}>Environment: Staging</Text>
         <Text style={styles.infoText}>Collection: cookies</Text>
       </View>
