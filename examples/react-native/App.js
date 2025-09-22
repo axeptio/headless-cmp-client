@@ -37,13 +37,24 @@ export default function App() {
   const [consentStatus, setConsentStatus] = useState('Not Set');
   const [lastConsentId, setLastConsentId] = useState(null);
   const [lastConsentToken, setLastConsentToken] = useState(null); // Store last used token
+  const [currentUserToken, setCurrentUserToken] = useState(null); // Persistent user token (fetched from API)
   const [configId, setConfigId] = useState(null);
 
-  // Fetch configuration and vendors on mount
+  // Fetch configuration, vendors, and token on mount
   useEffect(() => {
     const initializeApp = async () => {
       await fetchConfiguration();
       await fetchVendors();
+
+      // Fetch initial token from API
+      try {
+        const token = await fetchToken();
+        setCurrentUserToken(token);
+        console.log('App initialized with token:', token);
+      } catch (error) {
+        console.error('Failed to fetch initial token:', error);
+        // App can still work, user can generate token manually
+      }
     };
     initializeApp();
   }, []);
@@ -78,13 +89,27 @@ export default function App() {
   // Submit consent to API
   const submitConsent = async (isAcceptAll) => {
     setLoading(true);
-    
+
     // Ensure we have a configId
     let currentConfigId = configId;
     if (!currentConfigId) {
       currentConfigId = await fetchConfiguration();
       if (!currentConfigId) {
         Alert.alert('❌ Error', 'Could not fetch configuration. Please try again.');
+        setLoading(false);
+        return;
+      }
+    }
+
+    // Ensure we have a valid token from API
+    let tokenToUse = currentUserToken;
+    if (!tokenToUse) {
+      try {
+        tokenToUse = await fetchToken();
+        setCurrentUserToken(tokenToUse);
+        console.log('Fetched token for consent submission:', tokenToUse);
+      } catch (error) {
+        Alert.alert('❌ Error', `Could not get user token:\n\n${error.message}`);
         setLoading(false);
         return;
       }
@@ -96,18 +121,17 @@ export default function App() {
       vendorPreferences[vendorKey] = isAcceptAll || vendors[vendorKey] || false;
     });
 
-    const consentToken = `mobile_user_${Date.now()}`;
     const consent = {
       accept: true,
       preferences: {
         vendors: vendorPreferences
       },
-      token: consentToken
+      token: tokenToUse
     };
 
     // Store the token for later consent reading
-    setLastConsentToken(consentToken);
-    console.log('Generated consent token:', consentToken);
+    setLastConsentToken(tokenToUse);
+    console.log('Using consent token:', tokenToUse);
 
     try {
       const response = await fetch(
@@ -144,7 +168,7 @@ export default function App() {
         setLastConsentId(consentId);
         Alert.alert(
           '✅ Success',
-          `Consent saved successfully!\n\nStatus: ${response.status}\nID: ${consentId === 'saved' ? 'N/A' : consentId}\nToken: ${consentToken}`
+          `Consent saved successfully!\n\nStatus: ${response.status}\nID: ${consentId === 'saved' ? 'N/A' : consentId}\nToken: ${tokenToUse}`
         );
       } else {
         Alert.alert(
@@ -246,6 +270,61 @@ export default function App() {
       setVendorsLoading(false);
     }
     return null;
+  };
+
+  // Fetch a new user token from the API
+  const fetchToken = async () => {
+    try {
+      const response = await fetch(
+        `${API_BASE}/token`,
+        {
+          method: 'GET',
+          headers: {
+            'Accept': 'application/json',
+            'Authorization': `Bearer ${TEST_API_TOKEN}`
+          }
+        }
+      );
+
+      if (response.ok) {
+        const data = await response.json();
+        if (data.token) {
+          console.log('Fetched new token from API:', data.token);
+          return data.token;
+        } else {
+          throw new Error('Token not found in API response');
+        }
+      } else {
+        const errorText = await response.text();
+        throw new Error(`API error ${response.status}: ${errorText}`);
+      }
+    } catch (error) {
+      console.error('Failed to fetch token:', error);
+      throw error;
+    }
+  };
+
+  // Generate a new user token using the API
+  const generateNewToken = async () => {
+    setLoading(true);
+    try {
+      const newToken = await fetchToken();
+      setCurrentUserToken(newToken);
+      setLastConsentToken(null); // Clear last consent token since we have a new user
+      Alert.alert(
+        '🔄 New Token Generated',
+        `New user token: ${newToken}`,
+        [{ text: 'OK' }]
+      );
+    } catch (error) {
+      Alert.alert(
+        '❌ Token Generation Failed',
+        `Could not generate new token:\n\n${error.message}`,
+        [{ text: 'OK' }]
+      );
+    } finally {
+      setLoading(false);
+    }
   };
 
   // Check auth status
@@ -371,6 +450,7 @@ export default function App() {
         <Text style={styles.infoText}>Config ID: {configId || 'Loading...'}</Text>
         <Text style={styles.infoText}>Environment: Staging</Text>
         <Text style={styles.infoText}>Collection: cookies</Text>
+        <Text style={styles.infoText}>User Token: {currentUserToken || 'Loading...'}</Text>
       </View>
 
       <View style={styles.buttonContainer}>
@@ -396,6 +476,14 @@ export default function App() {
           disabled={loading}
         >
           <Text style={styles.secondaryButtonText}>🔐 Check Auth</Text>
+        </TouchableOpacity>
+
+        <TouchableOpacity
+          style={styles.secondaryButton}
+          onPress={generateNewToken}
+          disabled={loading}
+        >
+          <Text style={styles.secondaryButtonText}>🔄 Generate New Token</Text>
         </TouchableOpacity>
       </View>
 
