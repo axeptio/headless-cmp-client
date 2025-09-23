@@ -374,11 +374,15 @@ export default function App() {
     }
 
     setLoading(true);
+    console.log('=== CONSENT READ REQUEST ===');
     console.log('Reading consent with token:', lastConsentToken);
+    console.log('Request URL:', `${API_BASE}/mobile/client/${PROJECT_ID}/consents/${lastConsentToken}`);
+    console.log('============================');
+
     try {
       // Use the correct API endpoint format: /mobile/client/{projectId}/consents/{token}
       const response = await fetch(
-        `${API_BASE}/client/${PROJECT_ID}/consents/${lastConsentToken}`,
+        `${API_BASE}/mobile/client/${PROJECT_ID}/consents/${lastConsentToken}`,
         {
           headers: {
             'Accept': 'application/json',
@@ -389,7 +393,11 @@ export default function App() {
 
       if (response.ok) {
         const data = await response.json();
-        console.log('Consent API Response:', JSON.stringify(data, null, 2));
+        console.log('=== CONSENT READ API RESPONSE ===');
+        console.log('Status:', response.status);
+        console.log('Token used:', lastConsentToken);
+        console.log('Response data:', JSON.stringify(data, null, 2));
+        console.log('================================');
 
         if (data && typeof data === 'object' && Object.keys(data).length > 0) {
           const vendorCount = Object.keys(data.preferences?.vendors || {}).length;
@@ -403,6 +411,7 @@ export default function App() {
             [{ text: 'OK' }]
           );
         } else {
+          console.log('❌ Empty or invalid response data');
           Alert.alert(
             '📋 No Consent Found',
             'No existing consent found for this token.',
@@ -410,6 +419,9 @@ export default function App() {
           );
         }
       } else if (response.status === 404) {
+        const errorText = await response.text();
+        console.log('❌ 404 - No consent found for token:', lastConsentToken);
+        console.log('404 Response body:', errorText);
         Alert.alert(
           '📋 No Consent Found',
           `No existing consent found for token: ${lastConsentToken}`,
@@ -417,6 +429,7 @@ export default function App() {
         );
       } else {
         const errorText = await response.text();
+        console.log('❌ API Error - Status:', response.status, 'Response:', errorText);
         Alert.alert(
           '❌ Error',
           `Status: ${response.status}\n${errorText}`
