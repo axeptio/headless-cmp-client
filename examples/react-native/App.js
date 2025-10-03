@@ -788,7 +788,7 @@ export default function App() {
           </View>
 
           <ScrollView style={styles.settingsContent}>
-            <Text style={styles.settingLabel}>Project ID</Text>
+            <Text style={[styles.settingLabel, { marginTop: 8 }]}>Project ID</Text>
             <TextInput
               style={styles.textInput}
               value={tempProjectId}
@@ -1080,37 +1080,40 @@ const styles = StyleSheet.create({
     color: '#7f8c8d'
   },
   settingsContent: {
-    maxHeight: 400
+    maxHeight: 400,
+    paddingHorizontal: 4
   },
   settingLabel: {
-    fontSize: 14,
+    fontSize: 13,
     fontWeight: '600',
     color: '#2c3e50',
-    marginBottom: 8,
-    marginTop: 16
+    marginBottom: 10,
+    marginTop: 20
   },
   textInput: {
-    backgroundColor: '#f8f9fa',
+    backgroundColor: 'white',
     borderWidth: 1,
     borderColor: '#e0e0e0',
     borderRadius: 8,
-    padding: 12,
-    fontSize: 14,
-    color: '#2c3e50'
+    paddingHorizontal: 14,
+    paddingVertical: 14,
+    fontSize: 15,
+    color: '#2c3e50',
+    marginBottom: 4
   },
   environmentSelector: {
     flexDirection: 'row',
-    gap: 8,
-    flexWrap: 'wrap'
+    gap: 10,
+    marginBottom: 8
   },
   environmentOption: {
     flex: 1,
-    minWidth: '30%',
-    backgroundColor: '#f8f9fa',
-    borderWidth: 1,
+    backgroundColor: 'white',
+    borderWidth: 1.5,
     borderColor: '#e0e0e0',
     borderRadius: 8,
-    padding: 12,
+    paddingVertical: 14,
+    paddingHorizontal: 8,
     alignItems: 'center'
   },
   environmentOptionSelected: {
@@ -1118,53 +1121,59 @@ const styles = StyleSheet.create({
     borderColor: '#32C832'
   },
   environmentOptionText: {
-    fontSize: 14,
-    color: '#2c3e50',
-    fontWeight: '500'
+    fontSize: 13,
+    color: '#7f8c8d',
+    fontWeight: '600'
   },
   environmentOptionTextSelected: {
     color: 'white',
-    fontWeight: '600'
+    fontWeight: '700'
   },
   resetButton: {
-    marginTop: 20,
-    padding: 12,
+    marginTop: 24,
+    marginBottom: 8,
+    paddingVertical: 14,
     borderRadius: 8,
-    borderWidth: 1,
+    backgroundColor: 'white',
+    borderWidth: 1.5,
     borderColor: '#e74c3c',
     alignItems: 'center'
   },
   resetButtonText: {
     color: '#e74c3c',
     fontSize: 14,
-    fontWeight: '500'
+    fontWeight: '600'
   },
   settingsActions: {
     flexDirection: 'row',
-    gap: 10,
-    paddingTop: 20,
+    gap: 12,
+    paddingTop: 24,
+    marginTop: 8,
     borderTopWidth: 1,
-    borderTopColor: '#f0f0f0'
+    borderTopColor: '#e0e0e0'
   },
   settingsButton: {
     flex: 1,
-    padding: 15,
+    paddingVertical: 16,
     borderRadius: 8,
     alignItems: 'center'
   },
   cancelButton: {
-    backgroundColor: '#ecf0f1',
-    borderWidth: 1,
-    borderColor: '#bdc3c7'
+    backgroundColor: 'white',
+    borderWidth: 1.5,
+    borderColor: '#d0d0d0'
   },
   cancelButtonText: {
     color: '#7f8c8d',
-    fontSize: 16,
+    fontSize: 15,
     fontWeight: '600'
+  },
+  saveButton: {
+    backgroundColor: '#32C832'
   },
   saveButtonText: {
     color: 'white',
-    fontSize: 16,
+    fontSize: 15,
     fontWeight: '600'
   }
 });
