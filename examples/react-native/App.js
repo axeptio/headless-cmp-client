@@ -374,15 +374,26 @@ export default function App() {
     }
 
     setLoading(true);
+
+    // Ensure we have a configId for the query parameters
+    let currentConfigId = configId;
+    if (!currentConfigId) {
+      currentConfigId = await fetchConfiguration();
+      if (!currentConfigId) {
+        Alert.alert('❌ Error', 'Could not fetch configuration. Please try again.');
+        setLoading(false);
+        return;
+      }
+    }
     console.log('=== CONSENT READ REQUEST ===');
     console.log('Reading consent with token:', lastConsentToken);
-    console.log('Request URL:', `${API_BASE}/mobile/client/${PROJECT_ID}/consents/${lastConsentToken}`);
+    console.log('Request URL:', `${API_BASE}/client/${PROJECT_ID}/consents/${lastConsentToken}?identifier=${currentConfigId}&service=cookies`);
     console.log('============================');
 
     try {
-      // Use the correct API endpoint format: /mobile/client/{projectId}/consents/{token}
+      // Use the correct API endpoint format: /mobile/client/{projectId}/consents/{token}?identifier={configId}&service=cookies
       const response = await fetch(
-        `${API_BASE}/mobile/client/${PROJECT_ID}/consents/${lastConsentToken}`,
+        `${API_BASE}/client/${PROJECT_ID}/consents/${lastConsentToken}?identifier=${currentConfigId}&service=cookies`,
         {
           headers: {
             'Accept': 'application/json',
