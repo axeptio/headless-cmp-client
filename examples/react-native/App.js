@@ -565,7 +565,7 @@ export default function App() {
                         }}
                       />
                     )}
-                    {((vendor.image?.optimized?.small || vendor.image?.fallbackUrl) && failedImages.has(key)) && (
+                    {((vendor.image?.optimized?.small || vendor.image?.optimized?.medium || vendor.image?.fallbackUrl) && failedImages.has(key)) && (
                       <View style={[styles.vendorLogo, styles.vendorLogoPlaceholder]}>
                         <Text style={styles.vendorLogoText}>
                           {vendor.name.charAt(0).toUpperCase()}
