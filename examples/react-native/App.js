@@ -9,7 +9,9 @@ import {
   TouchableOpacity,
   Alert,
   SafeAreaView,
-  ActivityIndicator
+  ActivityIndicator,
+  Image,
+  Linking
 } from 'react-native';
 import Modal from 'react-native-modal';
 
@@ -28,18 +30,33 @@ const VENDORS = {
 export default function App() {
   const [modalVisible, setModalVisible] = useState(false);
   const [loading, setLoading] = useState(false);
-  const [vendors, setVendors] = useState({
-    google_analytics: false,
-    facebook_pixel: false,
-    mixpanel: false
-  });
+  const [vendorsLoading, setVendorsLoading] = useState(true);
+  const [vendors, setVendors] = useState({}); // Dynamic vendor preferences
+  const [apiVendors, setApiVendors] = useState(VENDORS); // Fallback to hardcoded initially
+  const [failedImages, setFailedImages] = useState(new Set()); // Track failed image loads
   const [consentStatus, setConsentStatus] = useState('Not Set');
   const [lastConsentId, setLastConsentId] = useState(null);
+  const [lastConsentToken, setLastConsentToken] = useState(null); // Store last used token
+  const [currentUserToken, setCurrentUserToken] = useState(null); // Persistent user token (fetched from API)
   const [configId, setConfigId] = useState(null);
 
-  // Fetch configuration on mount
+  // Fetch configuration, vendors, and token on mount
   useEffect(() => {
-    fetchConfiguration();
+    const initializeApp = async () => {
+      await fetchConfiguration();
+      await fetchVendors();
+
+      // Fetch initial token from API
+      try {
+        const token = await fetchToken();
+        setCurrentUserToken(token);
+        console.log('App initialized with token:', token);
+      } catch (error) {
+        console.error('Failed to fetch initial token:', error);
+        // App can still work, user can generate token manually
+      }
+    };
+    initializeApp();
   }, []);
 
   // Toggle individual vendor
@@ -52,7 +69,7 @@ export default function App() {
 
   // Accept all vendors
   const acceptAll = () => {
-    const allAccepted = Object.keys(VENDORS).reduce((acc, key) => ({
+    const allAccepted = Object.keys(apiVendors).reduce((acc, key) => ({
       ...acc,
       [key]: true
     }), {});
@@ -61,17 +78,18 @@ export default function App() {
 
   // Reject all vendors
   const rejectAll = () => {
-    const allRejected = Object.keys(VENDORS).reduce((acc, key) => ({
+    const allRejected = Object.keys(apiVendors).reduce((acc, key) => ({
       ...acc,
       [key]: false
     }), {});
     setVendors(allRejected);
   };
 
+
   // Submit consent to API
   const submitConsent = async (isAcceptAll) => {
     setLoading(true);
-    
+
     // Ensure we have a configId
     let currentConfigId = configId;
     if (!currentConfigId) {
@@ -82,18 +100,38 @@ export default function App() {
         return;
       }
     }
+
+    // Ensure we have a valid token from API
+    let tokenToUse = currentUserToken;
+    if (!tokenToUse) {
+      try {
+        tokenToUse = await fetchToken();
+        setCurrentUserToken(tokenToUse);
+        console.log('Fetched token for consent submission:', tokenToUse);
+      } catch (error) {
+        Alert.alert('❌ Error', `Could not get user token:\n\n${error.message}`);
+        setLoading(false);
+        return;
+      }
+    }
     
+    // Build vendor preferences dynamically
+    const vendorPreferences = {};
+    Object.keys(apiVendors).forEach(vendorKey => {
+      vendorPreferences[vendorKey] = isAcceptAll || vendors[vendorKey] || false;
+    });
+
     const consent = {
       accept: true,
       preferences: {
-        vendors: {
-          google_analytics: isAcceptAll || vendors.google_analytics,
-          facebook_pixel: isAcceptAll || vendors.facebook_pixel,
-          mixpanel: isAcceptAll || vendors.mixpanel
-        }
+        vendors: vendorPreferences
       },
-      token: `mobile_user_${Date.now()}`
+      token: tokenToUse
     };
+
+    // Store the token for later consent reading
+    setLastConsentToken(tokenToUse);
+    console.log('Using consent token:', tokenToUse);
 
     try {
       const response = await fetch(
@@ -118,11 +156,19 @@ export default function App() {
       }
 
       if (response.ok || response.status === 201) {
+        // Try to find the consent ID in various possible fields
+        const consentId = parsedData.id ||
+                         parsedData._id ||
+                         parsedData.consentId ||
+                         parsedData.uuid ||
+                         parsedData.insertedId ||
+                         'saved';
+
         setConsentStatus(isAcceptAll ? '✅ All Accepted' : '⚙️ Custom Preferences');
-        setLastConsentId(parsedData.id || 'saved');
+        setLastConsentId(consentId);
         Alert.alert(
-          '✅ Success', 
-          `Consent saved successfully!\n\nStatus: ${response.status}\nID: ${parsedData.id || 'N/A'}`
+          '✅ Success',
+          `Consent saved successfully!\n\nStatus: ${response.status}\nID: ${consentId === 'saved' ? 'N/A' : consentId}\nToken: ${tokenToUse}`
         );
       } else {
         Alert.alert(
@@ -150,7 +196,7 @@ export default function App() {
           }
         }
       );
-      
+
       if (response.ok) {
         const data = await response.json();
         if (data.defaultConfigId) {
@@ -162,6 +208,123 @@ export default function App() {
       console.error('Failed to fetch configuration:', error);
     }
     return null;
+  };
+
+  // Fetch vendors from API
+  const fetchVendors = async () => {
+    setVendorsLoading(true);
+    try {
+      const response = await fetch(
+        `${API_BASE}/vendors/${PROJECT_ID}`,
+        {
+          headers: {
+            'Accept': 'application/json',
+            'Authorization': `Bearer ${TEST_API_TOKEN}`
+          }
+        }
+      );
+
+      if (response.ok) {
+        const vendorData = await response.json();
+        if (vendorData && vendorData.vendors && Array.isArray(vendorData.vendors)) {
+          // Transform API response with simplified vendor data
+          const vendorMap = {};
+          const vendorPreferences = {};
+
+          vendorData.vendors.forEach(vendor => {
+            const vendorKey = vendor.name || vendor.id;
+            vendorMap[vendorKey] = {
+              id: vendor.id,
+              name: vendor.title || vendor.name,
+              description: vendor.description || 'No description available',
+              image: vendor.image
+            };
+            vendorPreferences[vendorKey] = false; // Default to not accepted
+
+          });
+
+          setApiVendors(vendorMap);
+          setVendors(vendorPreferences);
+          console.log(`Successfully loaded ${vendorData.vendors.length} vendors from API`);
+          setVendorsLoading(false);
+          return vendorMap;
+        }
+      } else {
+        console.warn(`Failed to fetch vendors: ${response.status} ${response.statusText}`);
+        // Fallback to hardcoded vendors
+        const hardcodedPreferences = Object.keys(VENDORS).reduce((acc, key) => ({
+          ...acc,
+          [key]: false
+        }), {});
+        setVendors(hardcodedPreferences);
+      }
+    } catch (error) {
+      console.error('Failed to fetch vendors:', error);
+      // Fallback to hardcoded vendors on error
+      const hardcodedPreferences = Object.keys(VENDORS).reduce((acc, key) => ({
+        ...acc,
+        [key]: false
+      }), {});
+      setVendors(hardcodedPreferences);
+    } finally {
+      setVendorsLoading(false);
+    }
+    return null;
+  };
+
+  // Fetch a new user token from the API
+  const fetchToken = async () => {
+    try {
+      const response = await fetch(
+        `${API_BASE}/token`,
+        {
+          method: 'GET',
+          headers: {
+            'Accept': 'application/json',
+            'Authorization': `Bearer ${TEST_API_TOKEN}`
+          }
+        }
+      );
+
+      if (response.ok) {
+        const data = await response.json();
+        if (data.token) {
+          console.log('Fetched new token from API:', data.token);
+          return data.token;
+        } else {
+          throw new Error('Token not found in API response');
+        }
+      } else {
+        const errorText = await response.text();
+        throw new Error(`API error ${response.status}: ${errorText}`);
+      }
+    } catch (error) {
+      console.error('Failed to fetch token:', error);
+      throw error;
+    }
+  };
+
+  // Generate a new user token using the API
+  const generateNewToken = async () => {
+    setLoading(true);
+    try {
+      const newToken = await fetchToken();
+      setCurrentUserToken(newToken);
+      setLastConsentToken(null); // Clear last consent token since we have a new user
+      Alert.alert(
+        '🔄 New Token Generated',
+        `New user token: ${newToken}`,
+        [{ text: 'OK' }]
+      );
+    } catch (error) {
+      Alert.alert(
+        '❌ Token Generation Failed',
+        `Could not generate new token:\n\n${error.message}`,
+        [{ text: 'OK' }]
+      );
+    } finally {
+      setLoading(false);
+    }
   };
 
   // Check auth status
@@ -177,7 +340,7 @@ export default function App() {
           }
         }
       );
-      
+
       if (response.ok) {
         const data = await response.json();
         Alert.alert(
@@ -194,6 +357,97 @@ export default function App() {
       }
     } catch (error) {
       Alert.alert('❌ Error', `Could not check auth:\n\n${error.message}`);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Check existing consent status
+  const checkConsentStatus = async () => {
+    if (!lastConsentToken) {
+      Alert.alert(
+        '📋 No Token Available',
+        'No consent has been submitted yet. Please submit a consent first to check its status.',
+        [{ text: 'OK' }]
+      );
+      return;
+    }
+
+    setLoading(true);
+
+    // Ensure we have a configId for the query parameters
+    let currentConfigId = configId;
+    if (!currentConfigId) {
+      currentConfigId = await fetchConfiguration();
+      if (!currentConfigId) {
+        Alert.alert('❌ Error', 'Could not fetch configuration. Please try again.');
+        setLoading(false);
+        return;
+      }
+    }
+    console.log('=== CONSENT READ REQUEST ===');
+    console.log('Reading consent with token:', lastConsentToken);
+    console.log('Request URL:', `${API_BASE}/client/${PROJECT_ID}/consents/${lastConsentToken}?identifier=${currentConfigId}&service=cookies`);
+    console.log('============================');
+
+    try {
+      // Use the correct API endpoint format: /mobile/client/{projectId}/consents/{token}?identifier={configId}&service=cookies
+      const response = await fetch(
+        `${API_BASE}/client/${PROJECT_ID}/consents/${lastConsentToken}?identifier=${currentConfigId}&service=cookies`,
+        {
+          headers: {
+            'Accept': 'application/json',
+            'Authorization': `Bearer ${TEST_API_TOKEN}`
+          }
+        }
+      );
+
+      if (response.ok) {
+        const data = await response.json();
+        console.log('=== CONSENT READ API RESPONSE ===');
+        console.log('Status:', response.status);
+        console.log('Token used:', lastConsentToken);
+        console.log('Response data:', JSON.stringify(data, null, 2));
+        console.log('================================');
+
+        if (data && typeof data === 'object' && Object.keys(data).length > 0) {
+          const vendorCount = Object.keys(data.preferences?.vendors || {}).length;
+          const acceptedVendors = Object.values(data.preferences?.vendors || {}).filter(Boolean).length;
+
+          const consentInfo = `Consent Found!\n\nAccepted: ${data.accept ? 'Yes' : 'No'}\nTotal Vendors: ${vendorCount}\nAccepted Vendors: ${acceptedVendors}\nToken: ${lastConsentToken}\nTimestamp: ${data.createdAt || data.timestamp || 'Unknown'}\nID: ${data.id || data._id || 'Unknown'}`;
+
+          Alert.alert(
+            '📋 Consent Status',
+            consentInfo,
+            [{ text: 'OK' }]
+          );
+        } else {
+          console.log('❌ Empty or invalid response data');
+          Alert.alert(
+            '📋 No Consent Found',
+            'No existing consent found for this token.',
+            [{ text: 'OK' }]
+          );
+        }
+      } else if (response.status === 404) {
+        const errorText = await response.text();
+        console.log('❌ 404 - No consent found for token:', lastConsentToken);
+        console.log('404 Response body:', errorText);
+        Alert.alert(
+          '📋 No Consent Found',
+          `No existing consent found for token: ${lastConsentToken}`,
+          [{ text: 'OK' }]
+        );
+      } else {
+        const errorText = await response.text();
+        console.log('❌ API Error - Status:', response.status, 'Response:', errorText);
+        Alert.alert(
+          '❌ Error',
+          `Status: ${response.status}\n${errorText}`
+        );
+      }
+    } catch (error) {
+      Alert.alert('❌ Error', `Could not check consent status:\n\n${error.message}`);
     } finally {
       setLoading(false);
     }
@@ -217,25 +471,43 @@ export default function App() {
       <View style={styles.infoCard}>
         <Text style={styles.infoTitle}>📡 API Configuration</Text>
         <Text style={styles.infoText}>Project ID: {PROJECT_ID}</Text>
+        <Text style={styles.infoText}>Config ID: {configId || 'Loading...'}</Text>
         <Text style={styles.infoText}>Environment: Staging</Text>
         <Text style={styles.infoText}>Collection: cookies</Text>
+        <Text style={styles.infoText}>User Token: {currentUserToken || 'Loading...'}</Text>
       </View>
 
       <View style={styles.buttonContainer}>
-        <TouchableOpacity 
-          style={styles.primaryButton} 
+        <TouchableOpacity
+          style={styles.primaryButton}
           onPress={() => setModalVisible(true)}
           disabled={loading}
         >
           <Text style={styles.primaryButtonText}>⚙️ Manage Consent</Text>
         </TouchableOpacity>
 
-        <TouchableOpacity 
-          style={styles.secondaryButton} 
+        <TouchableOpacity
+          style={styles.secondaryButton}
+          onPress={checkConsentStatus}
+          disabled={loading}
+        >
+          <Text style={styles.secondaryButtonText}>📋 Check Consent Status</Text>
+        </TouchableOpacity>
+
+        <TouchableOpacity
+          style={styles.secondaryButton}
           onPress={checkAuth}
           disabled={loading}
         >
           <Text style={styles.secondaryButtonText}>🔐 Check Auth</Text>
+        </TouchableOpacity>
+
+        <TouchableOpacity
+          style={styles.secondaryButton}
+          onPress={generateNewToken}
+          disabled={loading}
+        >
+          <Text style={styles.secondaryButtonText}>🔄 Generate New Token</Text>
         </TouchableOpacity>
       </View>
 
@@ -261,42 +533,76 @@ export default function App() {
           </View>
           
           <Text style={styles.modalDesc}>
-            We use cookies and similar technologies to improve your experience. 
+            We use cookies and similar technologies to improve your experience.
             Choose which services can process your data.
           </Text>
-          
-          <ScrollView style={styles.vendorList} showsVerticalScrollIndicator={false}>
-            {Object.entries(VENDORS).map(([key, vendor]) => (
-              <View key={key} style={styles.vendorItem}>
-                <View style={styles.vendorInfo}>
-                  <Text style={styles.vendorName}>{vendor.name}</Text>
-                  <Text style={styles.vendorDesc}>{vendor.description}</Text>
-                </View>
-                <Switch
-                  value={vendors[key]}
-                  onValueChange={() => toggleVendor(key)}
-                  trackColor={{ false: '#ddd', true: '#32C832' }}
-                  thumbColor={vendors[key] ? '#fff' : '#f4f3f4'}
-                  disabled={loading}
-                />
+
+          <ScrollView
+            style={styles.vendorList}
+            showsVerticalScrollIndicator={true}
+            contentContainerStyle={styles.vendorListContent}
+          >
+            {vendorsLoading ? (
+              <View style={styles.vendorLoading}>
+                <ActivityIndicator size="large" color="#32C832" />
+                <Text style={styles.loadingText}>Loading vendors...</Text>
               </View>
-            ))}
+            ) : (
+              Object.entries(apiVendors).map(([key, vendor]) => (
+                <View key={key} style={styles.vendorItem}>
+                  <View style={styles.vendorRow}>
+                    {(vendor.image?.optimized?.small || vendor.image?.optimized?.medium || vendor.image?.fallbackUrl) && !failedImages.has(key) && (
+                      <Image
+                        source={{
+                          uri: vendor.image?.optimized?.small ||
+                               vendor.image?.optimized?.medium ||
+                               vendor.image?.fallbackUrl
+                        }}
+                        style={styles.vendorLogo}
+                        onError={() => {
+                          // Mark this vendor's image as failed to avoid repeated attempts
+                          setFailedImages(prev => new Set([...prev, key]));
+                        }}
+                      />
+                    )}
+                    {((vendor.image?.optimized?.small || vendor.image?.optimized?.medium || vendor.image?.fallbackUrl) && failedImages.has(key)) && (
+                      <View style={[styles.vendorLogo, styles.vendorLogoPlaceholder]}>
+                        <Text style={styles.vendorLogoText}>
+                          {vendor.name.charAt(0).toUpperCase()}
+                        </Text>
+                      </View>
+                    )}
+                    <View style={styles.vendorInfo}>
+                      <Text style={styles.vendorName}>{vendor.name}</Text>
+                      <Text style={styles.vendorDesc}>{vendor.description}</Text>
+                    </View>
+                    <Switch
+                      value={vendors[key] || false}
+                      onValueChange={() => toggleVendor(key)}
+                      trackColor={{ false: '#ddd', true: '#32C832' }}
+                      thumbColor={vendors[key] ? '#fff' : '#f4f3f4'}
+                      disabled={loading || vendorsLoading}
+                    />
+                  </View>
+                </View>
+              ))
+            )}
           </ScrollView>
 
           <View style={styles.quickActions}>
-            <TouchableOpacity onPress={acceptAll} disabled={loading}>
-              <Text style={styles.quickActionText}>✓ Select All</Text>
+            <TouchableOpacity onPress={acceptAll} disabled={loading || vendorsLoading}>
+              <Text style={styles.quickActionText}>✓ Accept All</Text>
             </TouchableOpacity>
-            <TouchableOpacity onPress={rejectAll} disabled={loading}>
-              <Text style={styles.quickActionText}>✗ Deselect All</Text>
+            <TouchableOpacity onPress={rejectAll} disabled={loading || vendorsLoading}>
+              <Text style={styles.quickActionText}>✗ Reject All</Text>
             </TouchableOpacity>
           </View>
           
           <View style={styles.modalButtons}>
-            <TouchableOpacity 
-              style={styles.acceptButton} 
+            <TouchableOpacity
+              style={styles.acceptButton}
               onPress={() => submitConsent(true)}
-              disabled={loading}
+              disabled={loading || vendorsLoading}
             >
               {loading ? (
                 <ActivityIndicator color="white" />
@@ -304,11 +610,11 @@ export default function App() {
                 <Text style={styles.buttonText}>Accept All</Text>
               )}
             </TouchableOpacity>
-            
-            <TouchableOpacity 
-              style={styles.saveButton} 
+
+            <TouchableOpacity
+              style={styles.saveButton}
               onPress={() => submitConsent(false)}
-              disabled={loading}
+              disabled={loading || vendorsLoading}
             >
               <Text style={styles.buttonText}>Save My Choices</Text>
             </TouchableOpacity>
@@ -419,7 +725,9 @@ const styles = StyleSheet.create({
   modal: {
     backgroundColor: 'white',
     borderRadius: 16,
-    maxHeight: '80%'
+    maxHeight: '85%',
+    flex: 1,
+    marginVertical: 50
   },
   modalHeader: {
     flexDirection: 'row',
@@ -447,16 +755,39 @@ const styles = StyleSheet.create({
     lineHeight: 20
   },
   vendorList: {
-    maxHeight: 250,
-    paddingHorizontal: 20
+    flex: 1,
+    marginBottom: 10
+  },
+  vendorListContent: {
+    paddingHorizontal: 20,
+    paddingBottom: 10
   },
   vendorItem: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
     paddingVertical: 12,
     borderBottomWidth: 1,
     borderBottomColor: '#f0f0f0'
+  },
+  vendorRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between'
+  },
+  vendorLogo: {
+    width: 32,
+    height: 32,
+    borderRadius: 6,
+    marginRight: 12,
+    backgroundColor: '#f5f5f5'
+  },
+  vendorLogoPlaceholder: {
+    backgroundColor: '#e0e0e0',
+    justifyContent: 'center',
+    alignItems: 'center'
+  },
+  vendorLogoText: {
+    fontSize: 14,
+    fontWeight: 'bold',
+    color: '#666'
   },
   vendorInfo: {
     flex: 1,
@@ -505,5 +836,15 @@ const styles = StyleSheet.create({
     color: 'white',
     fontSize: 16,
     fontWeight: '600'
+  },
+  vendorLoading: {
+    padding: 40,
+    alignItems: 'center',
+    justifyContent: 'center'
+  },
+  loadingText: {
+    marginTop: 10,
+    fontSize: 14,
+    color: '#7f8c8d'
   }
 });
