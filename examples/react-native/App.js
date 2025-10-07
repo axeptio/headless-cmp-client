@@ -1081,7 +1081,7 @@ const styles = StyleSheet.create({
   },
   settingsContent: {
     maxHeight: 400,
-    paddingHorizontal: 4
+    paddingHorizontal: 20
   },
   settingLabel: {
     fontSize: 13,
@@ -1148,6 +1148,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     gap: 12,
     paddingTop: 24,
+    paddingHorizontal: 20,
     marginTop: 8,
     borderTopWidth: 1,
     borderTopColor: '#e0e0e0'
