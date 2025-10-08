@@ -203,7 +203,6 @@ export default function App() {
       accept: true,
       preferences: {
         config: {
-          id: currentConfigId,
           language: 'en',
           identifier: currentConfigId
         },
