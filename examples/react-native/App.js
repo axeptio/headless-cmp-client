@@ -29,7 +29,7 @@ const ENVIRONMENTS = {
   },
   'production': {
     name: 'Production',
-    url: 'https://api.axeptio.tech/mobile'
+    url: 'https://headless-api.axeptio.tech/mobile'
   }
 };
 
