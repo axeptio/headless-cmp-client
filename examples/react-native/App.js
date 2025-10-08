@@ -308,7 +308,7 @@ export default function App() {
           const vendorPreferences = {};
 
           vendorData.vendors.forEach(vendor => {
-            const vendorKey = vendor.name || vendor.id;
+            const vendorKey = vendor.id || vendor.name;
             vendorMap[vendorKey] = {
               id: vendor.id,
               name: vendor.title || vendor.name,
