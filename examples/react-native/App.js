@@ -11,14 +11,37 @@ import {
   SafeAreaView,
   ActivityIndicator,
   Image,
-  Linking
+  Linking,
+  TextInput
 } from 'react-native';
 import Modal from 'react-native-modal';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
-// Axeptio Configuration
-const PROJECT_ID = '67fcdb2b52ab9a99a5865f4d';
-const API_BASE = 'https://staging-api.axeptio.tech/mobile';
-const TEST_API_TOKEN = 'project_67fcdb2b52ab9a99a5865f4d_test_token'; // Authorized token for this project
+// Environment Configuration
+const ENVIRONMENTS = {
+  'local-dev': {
+    name: 'Local Dev',
+    url: 'http://localhost:3000/mobile'
+  },
+  'staging': {
+    name: 'Staging',
+    url: 'https://staging-api.axeptio.tech/mobile'
+  },
+  'production': {
+    name: 'Production',
+    url: 'https://headless-api.axeptio.tech/mobile'
+  }
+};
+
+// Default Configuration
+const DEFAULT_PROJECT_ID = '67fcdb2b52ab9a99a5865f4d';
+const DEFAULT_ENVIRONMENT = 'staging';
+
+// AsyncStorage Keys
+const STORAGE_KEYS = {
+  PROJECT_ID: '@axeptio_project_id',
+  ENVIRONMENT: '@axeptio_environment'
+};
 
 // Mock vendors since project config is empty
 const VENDORS = {
@@ -29,6 +52,7 @@ const VENDORS = {
 
 export default function App() {
   const [modalVisible, setModalVisible] = useState(false);
+  const [settingsModalVisible, setSettingsModalVisible] = useState(false);
   const [loading, setLoading] = useState(false);
   const [vendorsLoading, setVendorsLoading] = useState(true);
   const [vendors, setVendors] = useState({}); // Dynamic vendor preferences
@@ -40,7 +64,55 @@ export default function App() {
   const [currentUserToken, setCurrentUserToken] = useState(null); // Persistent user token (fetched from API)
   const [configId, setConfigId] = useState(null);
 
-  // Fetch configuration, vendors, and token on mount
+  // Settings state
+  const [projectId, setProjectId] = useState(DEFAULT_PROJECT_ID);
+  const [environment, setEnvironment] = useState(DEFAULT_ENVIRONMENT);
+  const [tempProjectId, setTempProjectId] = useState(DEFAULT_PROJECT_ID);
+  const [tempEnvironment, setTempEnvironment] = useState(DEFAULT_ENVIRONMENT);
+
+  // Derived values
+  const apiBase = ENVIRONMENTS[environment]?.url || ENVIRONMENTS[DEFAULT_ENVIRONMENT].url;
+  const apiToken = `project_${projectId}_test_token`;
+
+  // Load settings from AsyncStorage
+  const loadSettings = async () => {
+    try {
+      const savedProjectId = await AsyncStorage.getItem(STORAGE_KEYS.PROJECT_ID);
+      const savedEnvironment = await AsyncStorage.getItem(STORAGE_KEYS.ENVIRONMENT);
+
+      if (savedProjectId) {
+        setProjectId(savedProjectId);
+        setTempProjectId(savedProjectId);
+      }
+      if (savedEnvironment && ENVIRONMENTS[savedEnvironment]) {
+        setEnvironment(savedEnvironment);
+        setTempEnvironment(savedEnvironment);
+      }
+
+      console.log('Settings loaded:', { projectId: savedProjectId || DEFAULT_PROJECT_ID, environment: savedEnvironment || DEFAULT_ENVIRONMENT });
+    } catch (error) {
+      console.error('Failed to load settings:', error);
+    }
+  };
+
+  // Save settings to AsyncStorage
+  const saveSettings = async (newProjectId, newEnvironment) => {
+    try {
+      await AsyncStorage.setItem(STORAGE_KEYS.PROJECT_ID, newProjectId);
+      await AsyncStorage.setItem(STORAGE_KEYS.ENVIRONMENT, newEnvironment);
+      console.log('Settings saved:', { projectId: newProjectId, environment: newEnvironment });
+    } catch (error) {
+      console.error('Failed to save settings:', error);
+      throw error;
+    }
+  };
+
+  // Load settings on mount
+  useEffect(() => {
+    loadSettings();
+  }, []);
+
+  // Fetch configuration, vendors, and token on mount or when settings change
   useEffect(() => {
     const initializeApp = async () => {
       await fetchConfiguration();
@@ -56,8 +128,12 @@ export default function App() {
         // App can still work, user can generate token manually
       }
     };
-    initializeApp();
-  }, []);
+
+    // Only initialize if we have settings loaded
+    if (projectId && environment) {
+      initializeApp();
+    }
+  }, [projectId, environment]);
 
   // Toggle individual vendor
   const toggleVendor = (vendorKey) => {
@@ -118,13 +194,26 @@ export default function App() {
     // Build vendor preferences dynamically
     const vendorPreferences = {};
     Object.keys(apiVendors).forEach(vendorKey => {
-      vendorPreferences[vendorKey] = isAcceptAll || vendors[vendorKey] || false;
+      const vendor = apiVendors[vendorKey];
+      const formattedKey = `${vendor.id} (${vendor.name})`;
+      vendorPreferences[formattedKey] = isAcceptAll || vendors[vendorKey] || false;
     });
 
     const consent = {
       accept: true,
       preferences: {
+        config: {
+          language: 'en',
+          identifier: currentConfigId
+        },
         vendors: vendorPreferences
+      },
+      googleConsentMode: {
+        version: 2,
+        ad_storage: 'denied',
+        ad_user_data: 'denied',
+        analytics_storage: 'denied',
+        ad_personalization: 'denied'
       },
       token: tokenToUse
     };
@@ -135,13 +224,13 @@ export default function App() {
 
     try {
       const response = await fetch(
-        `${API_BASE}/consents/${PROJECT_ID}/cookies/${currentConfigId}`,
+        `${apiBase}/consents/${projectId}/cookies/${currentConfigId}`,
         {
           method: 'POST',
-          headers: { 
+          headers: {
             'Content-Type': 'application/json',
             'Accept': 'application/json',
-            'Authorization': `Bearer ${TEST_API_TOKEN}`
+            'Authorization': `Bearer ${apiToken}`
           },
           body: JSON.stringify(consent)
         }
@@ -188,11 +277,11 @@ export default function App() {
   const fetchConfiguration = async () => {
     try {
       const response = await fetch(
-        `${API_BASE}/configurations/${PROJECT_ID}`,
+        `${apiBase}/configurations/${projectId}`,
         {
           headers: {
             'Accept': 'application/json',
-            'Authorization': `Bearer ${TEST_API_TOKEN}`
+            'Authorization': `Bearer ${apiToken}`
           }
         }
       );
@@ -215,11 +304,11 @@ export default function App() {
     setVendorsLoading(true);
     try {
       const response = await fetch(
-        `${API_BASE}/vendors/${PROJECT_ID}`,
+        `${apiBase}/vendors/${projectId}`,
         {
           headers: {
             'Accept': 'application/json',
-            'Authorization': `Bearer ${TEST_API_TOKEN}`
+            'Authorization': `Bearer ${apiToken}`
           }
         }
       );
@@ -232,7 +321,7 @@ export default function App() {
           const vendorPreferences = {};
 
           vendorData.vendors.forEach(vendor => {
-            const vendorKey = vendor.name || vendor.id;
+            const vendorKey = `${vendor.id} (${vendor.title || vendor.name})`;
             vendorMap[vendorKey] = {
               id: vendor.id,
               name: vendor.title || vendor.name,
@@ -276,12 +365,12 @@ export default function App() {
   const fetchToken = async () => {
     try {
       const response = await fetch(
-        `${API_BASE}/token`,
+        `${apiBase}/token`,
         {
           method: 'GET',
           headers: {
             'Accept': 'application/json',
-            'Authorization': `Bearer ${TEST_API_TOKEN}`
+            'Authorization': `Bearer ${apiToken}`
           }
         }
       );
@@ -332,11 +421,11 @@ export default function App() {
     setLoading(true);
     try {
       const response = await fetch(
-        `${API_BASE}/auth/me`,
+        `${apiBase}/auth/me`,
         {
           headers: {
             'Accept': 'application/json',
-            'Authorization': `Bearer ${TEST_API_TOKEN}`
+            'Authorization': `Bearer ${apiToken}`
           }
         }
       );
@@ -387,17 +476,17 @@ export default function App() {
     }
     console.log('=== CONSENT READ REQUEST ===');
     console.log('Reading consent with token:', lastConsentToken);
-    console.log('Request URL:', `${API_BASE}/client/${PROJECT_ID}/consents/${lastConsentToken}?identifier=${currentConfigId}&service=cookies`);
+    console.log('Request URL:', `${apiBase}/client/${projectId}/consents/${lastConsentToken}?identifier=${currentConfigId}&service=cookies`);
     console.log('============================');
 
     try {
       // Use the correct API endpoint format: /mobile/client/{projectId}/consents/{token}?identifier={configId}&service=cookies
       const response = await fetch(
-        `${API_BASE}/client/${PROJECT_ID}/consents/${lastConsentToken}?identifier=${currentConfigId}&service=cookies`,
+        `${apiBase}/client/${projectId}/consents/${lastConsentToken}?identifier=${currentConfigId}&service=cookies`,
         {
           headers: {
             'Accept': 'application/json',
-            'Authorization': `Bearer ${TEST_API_TOKEN}`
+            'Authorization': `Bearer ${apiToken}`
           }
         }
       );
@@ -453,6 +542,69 @@ export default function App() {
     }
   };
 
+  // Open settings modal
+  const openSettings = () => {
+    setTempProjectId(projectId);
+    setTempEnvironment(environment);
+    setSettingsModalVisible(true);
+  };
+
+  // Save settings
+  const handleSaveSettings = async () => {
+    // Validate project ID
+    if (!tempProjectId || tempProjectId.trim() === '') {
+      Alert.alert('Validation Error', 'Project ID cannot be empty');
+      return;
+    }
+
+    setLoading(true);
+    try {
+      await saveSettings(tempProjectId, tempEnvironment);
+      setProjectId(tempProjectId);
+      setEnvironment(tempEnvironment);
+      setSettingsModalVisible(false);
+
+      // Reset app state when settings change
+      setConfigId(null);
+      setCurrentUserToken(null);
+      setLastConsentToken(null);
+      setLastConsentId(null);
+      setConsentStatus('Not Set');
+
+      Alert.alert('Settings Saved', 'App will reinitialize with new settings');
+    } catch (error) {
+      Alert.alert('Error', `Failed to save settings:\n\n${error.message}`);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Cancel settings changes
+  const handleCancelSettings = () => {
+    setTempProjectId(projectId);
+    setTempEnvironment(environment);
+    setSettingsModalVisible(false);
+  };
+
+  // Reset to default settings
+  const handleResetSettings = () => {
+    Alert.alert(
+      'Reset Settings',
+      'Reset to default settings (Staging environment)?',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Reset',
+          style: 'destructive',
+          onPress: () => {
+            setTempProjectId(DEFAULT_PROJECT_ID);
+            setTempEnvironment(DEFAULT_ENVIRONMENT);
+          }
+        }
+      ]
+    );
+  };
+
   return (
     <SafeAreaView style={styles.container}>
       <View style={styles.header}>
@@ -470,9 +622,9 @@ export default function App() {
 
       <View style={styles.infoCard}>
         <Text style={styles.infoTitle}>📡 API Configuration</Text>
-        <Text style={styles.infoText}>Project ID: {PROJECT_ID}</Text>
+        <Text style={styles.infoText}>Project ID: {projectId}</Text>
         <Text style={styles.infoText}>Config ID: {configId || 'Loading...'}</Text>
-        <Text style={styles.infoText}>Environment: Staging</Text>
+        <Text style={styles.infoText}>Environment: {ENVIRONMENTS[environment]?.name || 'Unknown'}</Text>
         <Text style={styles.infoText}>Collection: cookies</Text>
         <Text style={styles.infoText}>User Token: {currentUserToken || 'Loading...'}</Text>
       </View>
@@ -508,6 +660,14 @@ export default function App() {
           disabled={loading}
         >
           <Text style={styles.secondaryButtonText}>🔄 Generate New Token</Text>
+        </TouchableOpacity>
+
+        <TouchableOpacity
+          style={styles.secondaryButton}
+          onPress={openSettings}
+          disabled={loading}
+        >
+          <Text style={styles.secondaryButtonText}>⚙️ Settings</Text>
         </TouchableOpacity>
       </View>
 
@@ -601,22 +761,99 @@ export default function App() {
           <View style={styles.modalButtons}>
             <TouchableOpacity
               style={styles.acceptButton}
-              onPress={() => submitConsent(true)}
+              onPress={() => submitConsent(false)}
               disabled={loading || vendorsLoading}
             >
               {loading ? (
                 <ActivityIndicator color="white" />
               ) : (
-                <Text style={styles.buttonText}>Accept All</Text>
+                <Text style={styles.buttonText}>Save My Choices</Text>
               )}
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
+
+      <Modal
+        isVisible={settingsModalVisible}
+        onBackdropPress={() => !loading && handleCancelSettings()}
+        animationIn="slideInUp"
+        animationOut="slideOutDown"
+      >
+        <View style={styles.modal}>
+          <View style={styles.modalHeader}>
+            <Text style={styles.modalTitle}>Settings</Text>
+            <TouchableOpacity
+              onPress={handleCancelSettings}
+              disabled={loading}
+              style={styles.closeButton}
+            >
+              <Text style={styles.closeButtonText}>✕</Text>
+            </TouchableOpacity>
+          </View>
+
+          <ScrollView style={styles.settingsContent}>
+            <Text style={[styles.settingLabel, { marginTop: 8 }]}>Project ID</Text>
+            <TextInput
+              style={styles.textInput}
+              value={tempProjectId}
+              onChangeText={setTempProjectId}
+              placeholder="Enter project ID"
+              editable={!loading}
+              autoCapitalize="none"
+              autoCorrect={false}
+            />
+
+            <Text style={styles.settingLabel}>Environment</Text>
+            <View style={styles.environmentSelector}>
+              {Object.entries(ENVIRONMENTS).map(([key, env]) => (
+                <TouchableOpacity
+                  key={key}
+                  style={[
+                    styles.environmentOption,
+                    tempEnvironment === key && styles.environmentOptionSelected
+                  ]}
+                  onPress={() => setTempEnvironment(key)}
+                  disabled={loading}
+                >
+                  <Text
+                    style={[
+                      styles.environmentOptionText,
+                      tempEnvironment === key && styles.environmentOptionTextSelected
+                    ]}
+                  >
+                    {env.name}
+                  </Text>
+                </TouchableOpacity>
+              ))}
+            </View>
+
+            <TouchableOpacity
+              style={styles.resetButton}
+              onPress={handleResetSettings}
+              disabled={loading}
+            >
+              <Text style={styles.resetButtonText}>Reset to Defaults</Text>
+            </TouchableOpacity>
+          </ScrollView>
+
+          <View style={styles.settingsActions}>
+            <TouchableOpacity
+              style={[styles.settingsButton, styles.cancelButton]}
+              onPress={handleCancelSettings}
+              disabled={loading}
+            >
+              <Text style={styles.cancelButtonText}>Cancel</Text>
             </TouchableOpacity>
 
             <TouchableOpacity
-              style={styles.saveButton}
-              onPress={() => submitConsent(false)}
-              disabled={loading || vendorsLoading}
+              style={[styles.settingsButton, styles.saveButton]}
+              onPress={handleSaveSettings}
+              disabled={loading}
             >
-              <Text style={styles.buttonText}>Save My Choices</Text>
+              <Text style={styles.saveButtonText}>
+                {loading ? 'Saving...' : 'Save'}
+              </Text>
             </TouchableOpacity>
           </View>
         </View>
@@ -846,5 +1083,103 @@ const styles = StyleSheet.create({
     marginTop: 10,
     fontSize: 14,
     color: '#7f8c8d'
+  },
+  settingsContent: {
+    maxHeight: 400,
+    paddingHorizontal: 20
+  },
+  settingLabel: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: '#2c3e50',
+    marginBottom: 10,
+    marginTop: 20
+  },
+  textInput: {
+    backgroundColor: 'white',
+    borderWidth: 1,
+    borderColor: '#e0e0e0',
+    borderRadius: 8,
+    paddingHorizontal: 14,
+    paddingVertical: 14,
+    fontSize: 15,
+    color: '#2c3e50',
+    marginBottom: 4
+  },
+  environmentSelector: {
+    flexDirection: 'row',
+    gap: 10,
+    marginBottom: 8
+  },
+  environmentOption: {
+    flex: 1,
+    backgroundColor: 'white',
+    borderWidth: 1.5,
+    borderColor: '#e0e0e0',
+    borderRadius: 8,
+    paddingVertical: 14,
+    paddingHorizontal: 8,
+    alignItems: 'center'
+  },
+  environmentOptionSelected: {
+    backgroundColor: '#32C832',
+    borderColor: '#32C832'
+  },
+  environmentOptionText: {
+    fontSize: 13,
+    color: '#7f8c8d',
+    fontWeight: '600'
+  },
+  environmentOptionTextSelected: {
+    color: 'white',
+    fontWeight: '700'
+  },
+  resetButton: {
+    marginTop: 24,
+    marginBottom: 8,
+    paddingVertical: 14,
+    borderRadius: 8,
+    backgroundColor: 'white',
+    borderWidth: 1.5,
+    borderColor: '#e74c3c',
+    alignItems: 'center'
+  },
+  resetButtonText: {
+    color: '#e74c3c',
+    fontSize: 14,
+    fontWeight: '600'
+  },
+  settingsActions: {
+    flexDirection: 'row',
+    gap: 12,
+    paddingTop: 24,
+    paddingHorizontal: 20,
+    marginTop: 8,
+    borderTopWidth: 1,
+    borderTopColor: '#e0e0e0'
+  },
+  settingsButton: {
+    flex: 1,
+    paddingVertical: 16,
+    borderRadius: 8,
+    alignItems: 'center'
+  },
+  cancelButton: {
+    backgroundColor: 'white',
+    borderWidth: 1.5,
+    borderColor: '#d0d0d0'
+  },
+  cancelButtonText: {
+    color: '#7f8c8d',
+    fontSize: 15,
+    fontWeight: '600'
+  },
+  saveButton: {
+    backgroundColor: '#32C832'
+  },
+  saveButtonText: {
+    color: 'white',
+    fontSize: 15,
+    fontWeight: '600'
   }
 });
