@@ -748,22 +748,14 @@ export default function App() {
           <View style={styles.modalButtons}>
             <TouchableOpacity
               style={styles.acceptButton}
-              onPress={() => submitConsent(true)}
+              onPress={() => submitConsent(false)}
               disabled={loading || vendorsLoading}
             >
               {loading ? (
                 <ActivityIndicator color="white" />
               ) : (
-                <Text style={styles.buttonText}>Accept All</Text>
+                <Text style={styles.buttonText}>Save My Choices</Text>
               )}
-            </TouchableOpacity>
-
-            <TouchableOpacity
-              style={styles.saveButton}
-              onPress={() => submitConsent(false)}
-              disabled={loading || vendorsLoading}
-            >
-              <Text style={styles.buttonText}>Save My Choices</Text>
             </TouchableOpacity>
           </View>
         </View>
