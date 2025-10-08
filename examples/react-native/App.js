@@ -194,13 +194,27 @@ export default function App() {
     // Build vendor preferences dynamically
     const vendorPreferences = {};
     Object.keys(apiVendors).forEach(vendorKey => {
-      vendorPreferences[vendorKey] = isAcceptAll || vendors[vendorKey] || false;
+      const vendor = apiVendors[vendorKey];
+      const formattedKey = `${vendor.id} (${vendor.name})`;
+      vendorPreferences[formattedKey] = isAcceptAll || vendors[vendorKey] || false;
     });
 
     const consent = {
       accept: true,
       preferences: {
+        config: {
+          id: currentConfigId,
+          language: null,
+          identifier: currentConfigId
+        },
         vendors: vendorPreferences
+      },
+      googleConsentMode: {
+        version: 2,
+        ad_storage: 'denied',
+        ad_user_data: 'denied',
+        analytics_storage: 'denied',
+        ad_personalization: 'denied'
       },
       token: tokenToUse
     };
@@ -308,7 +322,7 @@ export default function App() {
           const vendorPreferences = {};
 
           vendorData.vendors.forEach(vendor => {
-            const vendorKey = vendor.id || vendor.name;
+            const vendorKey = `${vendor.id} (${vendor.title || vendor.name})`;
             vendorMap[vendorKey] = {
               id: vendor.id,
               name: vendor.title || vendor.name,
