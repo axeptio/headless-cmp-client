@@ -204,7 +204,7 @@ export default function App() {
       preferences: {
         config: {
           id: currentConfigId,
-          language: null,
+          language: 'en',
           identifier: currentConfigId
         },
         vendors: vendorPreferences
