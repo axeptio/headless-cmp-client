@@ -102,15 +102,6 @@ const consent = await fetch(
 
 ---
 
-## Platform Support
-
-| Platform | Status |
-|----------|--------|
-| React Native | Available — see [guide](./docs/platform-guides/react-native.md) and [example](./examples/react-native/) |
-| iOS (Swift) | Roadmap |
-| Android (Kotlin) | Roadmap |
-| Flutter | Roadmap |
-
 ---
 
 ## License
