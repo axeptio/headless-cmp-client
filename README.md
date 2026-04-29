@@ -102,8 +102,6 @@ const consent = await fetch(
 
 ---
 
----
-
 ## License
 
 MIT — see [LICENSE](./LICENSE).
