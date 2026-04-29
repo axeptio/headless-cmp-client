@@ -29,6 +29,14 @@ The Axeptio API uses **Bearer Token Authentication** with JWT (JSON Web Tokens) 
 
 ## Getting Your API Token
 
+### Validate an existing token
+
+```bash
+curl https://headless-api.axeptio.tech/mobile/auth/me \
+  -H "Authorization: Bearer YOUR_API_TOKEN"
+# → { "valid": true, "projectId": "...", "tier": "enterprise" }
+```
+
 ### 1. Axeptio Dashboard
 
 1. Log into [dashboard.axept.io](https://dashboard.axept.io)
@@ -41,114 +49,14 @@ The Axeptio API uses **Bearer Token Authentication** with JWT (JSON Web Tokens) 
 
 Configure access levels for your token:
 
-| Permission           | Description                   | Endpoints                                    |
-| -------------------- | ----------------------------- | -------------------------------------------- |
-| **Read Projects**    | Get project configuration     | `GET /vault/project/*`                       |
-| **Manage Consents**  | Collect and retrieve consents | `POST /app/consents/*`, `GET /app/consent/*` |
-| **Analytics Access** | View consent statistics       | `GET /stats/*`                               |
-| **Admin Access**     | Full project management       | All endpoints                                |
+| Permission           | Description                   | Endpoints                                                                       |
+| -------------------- | ----------------------------- | ------------------------------------------------------------------------------- |
+| **Read Projects**    | Get project configuration     | `GET /mobile/configurations/*`, `GET /mobile/vendors/*`                         |
+| **Manage Consents**  | Collect and retrieve consents | `POST /mobile/consents/*`, `GET /mobile/client/*/consents/*`                    |
+| **Analytics Access** | View consent statistics       | `POST /mobile/analytics/evts`                                                   |
+| **Admin Access**     | Full project management       | All endpoints                                                                   |
 
 ## Secure Token Storage
-
-### iOS (Swift) - Keychain
-
-```swift
-import Security
-
-class SecureTokenStorage {
-    private let service = "com.yourapp.axeptio"
-    private let account = "api_token"
-
-    func storeToken(_ token: String) -> Bool {
-        let data = token.data(using: .utf8)!
-
-        let query: [String: Any] = [
-            kSecClass as String: kSecClassGenericPassword,
-            kSecAttrService as String: service,
-            kSecAttrAccount as String: account,
-            kSecValueData as String: data
-        ]
-
-        // Delete any existing token
-        SecItemDelete(query as CFDictionary)
-
-        // Add new token
-        let status = SecItemAdd(query as CFDictionary, nil)
-        return status == errSecSuccess
-    }
-
-    func getToken() -> String? {
-        let query: [String: Any] = [
-            kSecClass as String: kSecClassGenericPassword,
-            kSecAttrService as String: service,
-            kSecAttrAccount as String: account,
-            kSecReturnData as String: true,
-            kSecMatchLimit as String: kSecMatchLimitOne
-        ]
-
-        var dataTypeRef: AnyObject?
-        let status = SecItemCopyMatching(query as CFDictionary, &dataTypeRef)
-
-        guard status == errSecSuccess,
-              let data = dataTypeRef as? Data else {
-            return nil
-        }
-
-        return String(data: data, encoding: .utf8)
-    }
-
-    func deleteToken() -> Bool {
-        let query: [String: Any] = [
-            kSecClass as String: kSecClassGenericPassword,
-            kSecAttrService as String: service,
-            kSecAttrAccount as String: account
-        ]
-
-        let status = SecItemDelete(query as CFDictionary)
-        return status == errSecSuccess
-    }
-}
-```
-
-### Android (Kotlin) - EncryptedSharedPreferences
-
-```kotlin
-import androidx.security.crypto.EncryptedSharedPreferences
-import androidx.security.crypto.MasterKeys
-import android.content.Context
-
-class SecureTokenStorage(private val context: Context) {
-    private val masterKeyAlias = MasterKeys.getOrCreate(MasterKeys.AES256_GCM_SPEC)
-
-    private val sharedPreferences = EncryptedSharedPreferences.create(
-        "axeptio_secure_prefs",
-        masterKeyAlias,
-        context,
-        EncryptedSharedPreferences.PrefKeyEncryptionScheme.AES256_SIV,
-        EncryptedSharedPreferences.PrefValueEncryptionScheme.AES256_GCM
-    )
-
-    fun storeToken(token: String) {
-        sharedPreferences.edit()
-            .putString("api_token", token)
-            .apply()
-    }
-
-    fun getToken(): String? {
-        return sharedPreferences.getString("api_token", null)
-    }
-
-    fun deleteToken() {
-        sharedPreferences.edit()
-            .remove("api_token")
-            .apply()
-    }
-
-    fun hasToken(): Boolean {
-        return getToken() != null
-    }
-}
-```
 
 ### React Native - Secure Storage
 
@@ -523,4 +431,4 @@ describe("API Integration", () => {
 
 ---
 
-**Next Steps**: [Rate Limits & Tiers Guide](./rate-limits.md) | [API Reference](../api-reference/)
+**Next Steps**: [API Reference](../api-reference/overview.md) | [React Native Guide](../platform-guides/react-native.md)

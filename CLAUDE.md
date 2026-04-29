@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Repository Overview
 
-This is the Axeptio Headless CMP Client SDKs repository, containing client-side implementations for integrating Axeptio's consent management solution into mobile and web applications. The repository is in early development with documentation and example placeholders for iOS, Android, React Native, and Flutter platforms.
+This is the Axeptio Headless CMP Client repository — public documentation and React Native example for integrating Axeptio's consent management solution. React Native is the current implemented platform; iOS, Android, and Flutter are on the roadmap.
 
 ## Core Concepts
 
@@ -16,66 +16,51 @@ Axeptio provides a headless consent management solution for GDPR/CCPA compliance
 - Compliance with privacy regulations
 
 ### API Architecture
-The clients interact with the Axeptio API:
-- Base URL: `https://api.axept.io/v1/` (Production)
-- Staging API Docs: `https://staging-api.axeptio.tech/mobile/docs/`
+The clients interact with the Axeptio mobile API:
+- Base URL: `https://headless-api.axeptio.tech` (Production)
+- Staging: `https://staging-api.axeptio.tech`
+- Swagger UI: `https://headless-api.axeptio.tech/mobile/docs`
 - Main endpoints:
   - `POST /mobile/consents/{clientId}/{collection}/{configId}` - Submit consent
-  - `GET /mobile/consents/{projectId}` - Retrieve consent status
-  - `GET /vault/project/{projectId}` - Get project configuration
+  - `GET /mobile/client/{projectId}/consents/{token}` - Retrieve consent status
+  - `GET /mobile/configurations/{projectId}` - Get project configuration
+  - `GET /mobile/token` - Generate consent token
+  - `GET /mobile/auth/me` - Validate bearer token
 
 ## Repository Structure
 
 ```
 headless-cmp-client/
 ├── docs/
-│   ├── getting-started/     # Quick start and setup guides
-│   │   ├── quick-start.md   # 5-minute integration guide
-│   │   └── authentication.md # API authentication setup
-│   └── platform-guides/     # Platform-specific docs (placeholders)
-│       ├── ios-swift.md
-│       ├── android-kotlin.md
-│       ├── react-native.md
-│       └── flutter.md
-├── examples/                # Example apps (placeholders)
-│   ├── android/
-│   ├── flutter/
-│   ├── ios/
-│   └── react-native/
-└── sdks/                    # SDK source (empty - coming soon)
+│   ├── api-reference/
+│   │   └── overview.md          # Full endpoint catalog, rate limits, error codes
+│   ├── getting-started/
+│   │   ├── quick-start.md       # 5-minute integration guide
+│   │   └── authentication.md    # Bearer tokens, secure storage, error handling
+│   └── platform-guides/
+│       ├── react-native.md      # useConsent hook, offline queue, Google Consent Mode
+│       └── mobile-integration-reference.md  # Multi-platform reference (iOS/Android/RN)
+└── examples/
+    └── react-native/            # Working Expo demo with consent modal
 ```
 
 ## Development Status
 
-**Current State**: Documentation and structure only. No actual SDK implementations exist yet.
+**Current State**: React Native documentation and example are complete. Other platforms are on the roadmap.
 
-- Documentation: Quick start guide complete, platform guides are placeholders
-- Examples: Directory structure only, no code
-- SDKs: Empty directory, implementations coming soon
+- Documentation: Quick start, authentication, API reference, and React Native guide — all complete
+- Examples: `examples/react-native/` — working Expo demo
+- iOS, Android, Flutter: roadmap
 
 ## Common Development Tasks
 
-Since this is a documentation/planning repository, there are no build, test, or deployment commands currently. When SDKs are implemented, platform-specific commands will be:
+### React Native Example
 
-### Future iOS Development
-- Build: `swift build` 
-- Test: `swift test`
-- Package: Swift Package Manager integration
-
-### Future Android Development  
-- Build: `./gradlew build`
-- Test: `./gradlew test`
-- Package: Maven Central deployment
-
-### Future React Native Development
-- Install: `npm install`
-- Test: `npm test`
-- Package: npm registry
-
-### Future Flutter Development
-- Get dependencies: `flutter pub get`
-- Test: `flutter test`
-- Package: pub.dev deployment
+```bash
+cd examples/react-native
+npm install
+npm start        # Expo dev server
+```
 
 ## Key Implementation Requirements
 
