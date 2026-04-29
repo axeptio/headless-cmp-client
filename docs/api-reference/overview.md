@@ -46,13 +46,7 @@ See [Authentication Guide](../getting-started/authentication.md) for secure stor
 
 ## Rate Limits
 
-| Tier | Requests / minute |
-|------|-------------------|
-| Free | 100 |
-| Pro | 1 000 |
-| Enterprise | 10 000 |
-
-On limit breach the API returns `429 Too Many Requests` with a `Retry-After` header. Use exponential backoff.
+Rate limits vary by tier. On limit breach the API returns `429 Too Many Requests` with a `Retry-After` header. Use exponential backoff.
 
 ---
 
