@@ -117,11 +117,6 @@ Full endpoint reference: [API Reference](../api-reference/overview.md)
 
 **Network timeout** — Add offline queue support. See [React Native Guide](../platform-guides/react-native.md#offline-queue).
 
-## Support
-
-- Email: [cmp-support@axeptio.eu](mailto:cmp-support@axeptio.eu)
-- Issues: [github.com/axeptio/headless-cmp/issues](https://github.com/axeptio/headless-cmp/issues)
-
 ---
 
 Next: [Authentication Guide →](./authentication.md) | [React Native Guide →](../platform-guides/react-native.md)
