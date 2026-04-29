@@ -27,7 +27,9 @@ The Axeptio API uses **Bearer Token Authentication** with JWT (JSON Web Tokens) 
 **Scope**: User-level consent data
 **Lifetime**: Persistent until user deletion
 
-## Getting Your API Token
+## Getting Your Credentials
+
+To get API access, [contact our sales team](https://www.axeptio.eu). Once onboarded, you will receive your **Project ID** and **API Token**.
 
 ### Validate an existing token
 
@@ -37,15 +39,7 @@ curl https://headless-api.axeptio.tech/mobile/auth/me \
 # → { "valid": true, "projectId": "...", "tier": "enterprise" }
 ```
 
-### 1. Axeptio Dashboard
-
-1. Log into [dashboard.axept.io](https://dashboard.axept.io)
-2. Navigate to **Project Settings** → **API Access**
-3. Click **Generate New Token**
-4. Configure permissions and expiration
-5. **Copy and store securely** (shown only once)
-
-### 2. Token Permissions
+### Token Permissions
 
 Configure access levels for your token:
 
