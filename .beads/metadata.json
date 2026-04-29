@@ -1,0 +1,8 @@
+{
+  "database": "dolt",
+  "backend": "dolt",
+  "dolt_mode": "server",
+  "dolt_database": "headless_cmp_client",
+  "project_id": "3e86b274-6a0b-46e3-8fb0-7af01ea88ae5",
+  "global_dolt_database": "beads_global"
+}
