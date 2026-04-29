@@ -113,11 +113,6 @@ const consent = await fetch(
 
 ---
 
-## Support
-
-- Email: [cmp-support@axeptio.eu](mailto:cmp-support@axeptio.eu)
-- Issues: [github.com/axeptio/headless-cmp/issues](https://github.com/axeptio/headless-cmp/issues)
-
 ## License
 
 MIT — see [LICENSE](./LICENSE).
