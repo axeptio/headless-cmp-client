@@ -10,9 +10,7 @@ Get consent running in your React Native app in minutes.
 
 ## Step 1: Get Your Credentials
 
-1. Log into [dashboard.axept.io](https://dashboard.axept.io)
-2. Open your project → **Settings → API Access**
-3. Note your **Project ID** and generate an **API Token** (shown once — save it securely)
+To get API access, [contact our sales team](https://www.axeptio.eu). Once onboarded, you will receive your **Project ID** and **API Token**.
 
 > Store your token in the device keychain, not in source code or plain AsyncStorage. See [Authentication Guide](./authentication.md).
 
