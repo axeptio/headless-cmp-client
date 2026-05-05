@@ -26,7 +26,6 @@ Base URL: `https://headless-api.axeptio.tech`
 |--------|------|-------------|
 | `POST` | `/mobile/consents/{clientId}/{collection}/{configId}` | Submit a consent record |
 | `GET` | `/mobile/client/{projectId}/consents/{token}` | Retrieve consent status for a user token |
-| `POST` | `/mobile/consents/batch` | Batch submit (offline sync) |
 | `GET` | `/mobile/configurations/{projectId}` | Mobile-optimized project configuration |
 | `GET` | `/mobile/token` | Generate a secure consent token |
 | `GET` | `/mobile/auth/me` | Validate bearer token + get project/tier info |
@@ -60,8 +59,13 @@ const { token } = await fetch(`${BASE_URL}/mobile/token`, {
   headers: { Authorization: `Bearer ${API_TOKEN}` }
 }).then(r => r.json());
 
-// 2. Submit consent
-await fetch(`${BASE_URL}/mobile/consents/${PROJECT_ID}/cookies/default`, {
+// 2. Fetch configuration to get configId
+const { defaultConfigId } = await fetch(`${BASE_URL}/mobile/configurations/${PROJECT_ID}`, {
+  headers: { Authorization: `Bearer ${API_TOKEN}` }
+}).then(r => r.json());
+
+// 3. Submit consent
+await fetch(`${BASE_URL}/mobile/consents/${PROJECT_ID}/cookies/${defaultConfigId}`, {
   method: 'POST',
   headers: {
     Authorization: `Bearer ${API_TOKEN}`,
@@ -75,9 +79,9 @@ await fetch(`${BASE_URL}/mobile/consents/${PROJECT_ID}/cookies/default`, {
   }),
 });
 
-// 3. Read consent back
+// 4. Read consent back
 const consent = await fetch(
-  `${BASE_URL}/mobile/client/${PROJECT_ID}/consents/${token}`,
+  `${BASE_URL}/mobile/client/${PROJECT_ID}/consents/${token}?identifier=${defaultConfigId}&service=cookies`,
   { headers: { Authorization: `Bearer ${API_TOKEN}` } }
 ).then(r => r.json());
 ```

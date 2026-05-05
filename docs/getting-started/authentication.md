@@ -36,7 +36,7 @@ To get API access, [contact our sales team](https://www.axeptio.eu). Once onboar
 ```bash
 curl https://headless-api.axeptio.tech/mobile/auth/me \
   -H "Authorization: Bearer YOUR_API_TOKEN"
-# → { "valid": true, "projectId": "...", "tier": "enterprise" }
+# → { "authorized": true, "projectId": "...", "tier": "pro", "timestamp": "..." }
 ```
 
 ### Token Permissions
@@ -109,7 +109,7 @@ class SecureTokenStorage {
 
 ```javascript
 class AxeptioAuthenticatedClient {
-  constructor(baseURL = "https://api.axept.io/v1") {
+  constructor(baseURL = "https://headless-api.axeptio.tech/mobile") {
     this.baseURL = baseURL;
     this.tokenStorage = new SecureTokenStorage();
   }
