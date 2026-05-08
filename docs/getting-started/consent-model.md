@@ -107,7 +107,7 @@ Google Consent Mode v2 signals. See [Google Consent Mode v2](#google-consent-mod
 }
 ```
 
-This is tracked as [MSK-208 (Medium)](../issues/MSK-208) in the example app.
+This is tracked as a known issue (MSK-208) in the internal Axeptio ticket management, directed to the Example App..
 
 #### `value` (optional)
 
@@ -382,7 +382,7 @@ To submit multiple consents, call the single-consent endpoint multiple times (or
 
 - See how this payload fits into the full integration: [Integration Lifecycle](./integration-lifecycle.md)
 - Implement this in your app: [React Native Guide](../platform-guides/react-native.md)
-- Deep dive into Google Consent Mode: [Google Consent Mode](../advanced/google-consent-mode.md)
+- Deep dive into Google Consent Mode: see the [Google Consent Mode v2](#google-consent-mode-v2) section above
 
 ---
 

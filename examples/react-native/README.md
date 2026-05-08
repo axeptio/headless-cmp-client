@@ -149,6 +149,7 @@ const API_BASE = 'https://staging-api.axeptio.tech/mobile';
   }
 }
 ```
+"Note: The example app currently places googleConsentMode at the top level, which is incorrect. This is tracked as known issue in internal Axeptio ticket management: MSK-208. The payload shown here is the correct structure."
 
 ## Customization
 

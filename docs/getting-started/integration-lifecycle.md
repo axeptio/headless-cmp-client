@@ -352,7 +352,7 @@ If you're using one of Axeptio's native SDKs (iOS, Android, Flutter) instead of 
 
 - Understand the consent payload in detail: [Consent Model](./consent-model.md)
 - Implement this flow in your platform: [React Native Guide](../platform-guides/react-native.md)
-- Explore advanced topics: [Google Consent Mode](../advanced/google-consent-mode.md), [Offline Support](../advanced/offline-support.md)
+- Explore Google Consent Mode: [Consent Model: Google Consent Mode v2](./consent-model.md#google-consent-mode-v2)
 
 ---
 

@@ -7,7 +7,7 @@ For the full step-by-step flow, see [Integration Lifecycle](./integration-lifecy
 ## Prerequisites
 
 - Axeptio API token and project ID (see [Get your credentials](./credentials.md))
-- A terminal with cURL (for steps 1-3)
+- A terminal with cURL and [jq](https://jqlang.github.io/jq/) (for steps 1-3)
 - React Native 0.73+ or Expo SDK 50+ (for step 4, if using the example app)
 
 ## Step 1: Validate your token
