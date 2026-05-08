@@ -114,14 +114,14 @@ const API_BASE = 'https://staging-api.axeptio.tech/mobile';
 
 ## API Endpoints Used
 
-| Endpoint | Method | Purpose |
+| Path (relative to API_BASE) | Method | Purpose |
 |----------|--------|---------|
-| `/mobile/configurations/{projectId}` | GET | Fetch project configuration and configId |
-| `/mobile/vendors/{projectId}` | GET | Fetch vendor list |
-| `/mobile/token` | GET | Generate a consent user token |
-| `/mobile/consents/{projectId}/cookies/{configId}` | POST | Submit user consent |
-| `/mobile/client/{projectId}/consents/{token}?identifier={configId}&service=cookies` | GET | Retrieve consent status |
-| `/mobile/auth/me` | GET | Validate bearer token |
+| `/configurations/{projectId}` | GET | Fetch project configuration and configId |
+| `/vendors/{projectId}` | GET | Fetch vendor list |
+| `/token` | GET | Generate a consent user token |
+| `/consents/{projectId}/cookies/{configId}` | POST | Submit user consent |
+| `/client/{projectId}/consents/{token}?identifier={configId}&service=cookies` | GET | Retrieve consent status |
+| `/auth/me` | GET | Validate bearer token |
 
 ### Consent Payload Structure
 
