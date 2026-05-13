@@ -20,8 +20,8 @@ Raw OpenAPI specs:
 
 | Environment | Base URL | When to use |
 |-------------|----------|-------------|
-| Production | `https://headless-api.axeptio.tech/mobile` | Live apps, real consent data |
-| Staging | `https://staging-api.axeptio.tech/mobile` | Testing, development, experiments |
+| Production | `https://headless-api.axeptio.tech` | Live apps, real consent data |
+| Staging | `https://staging-api.axeptio.tech` | Testing, development, experiments |
 
 > **Warning**: You may encounter `https://api.axept.io/v1` in older examples or external guides. This is the wrong URL for the headless API. Always use the URLs above.
 
