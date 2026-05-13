@@ -107,7 +107,7 @@ Google Consent Mode v2 signals. See [Google Consent Mode v2](#google-consent-mod
 }
 ```
 
-This is tracked as a known issue (MSK-208) in the internal Axeptio ticket management, directed to the Example App..
+This is tracked as a known issue (MSK-208) in the internal Axeptio ticket management system for the Example App.
 
 #### `value` (optional)
 
