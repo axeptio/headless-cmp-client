@@ -52,7 +52,7 @@ npm run web
 ## Architecture
 
 ### Single File Implementation
-The entire demo is contained in `App.js` (~350 lines) for simplicity:
+The entire demo is contained in `App.js` for simplicity:
 
 ```
 App.js
@@ -73,11 +73,14 @@ App.js
 
 #### API Integration
 ```javascript
-// Submit consent
-POST /mobile/consents/{projectId}/cookies/default
+// Fetch configuration
+GET /mobile/configurations/{projectId}
 
-// Check consent status  
-GET /mobile/consents/{projectId}?token=demo_user
+// Submit consent
+POST /mobile/consents/{projectId}/cookies/{configId}
+
+// Check consent status
+GET /mobile/client/{projectId}/consents/{token}?identifier={configId}&service=cookies
 ```
 
 ## Features
@@ -111,31 +114,42 @@ const API_BASE = 'https://staging-api.axeptio.tech/mobile';
 
 ## API Endpoints Used
 
-| Endpoint | Method | Purpose |
+| Path (relative to API_BASE) | Method | Purpose |
 |----------|--------|---------|
-| `/mobile/consents/{projectId}/cookies/default` | POST | Submit user consent |
-| `/mobile/consents/{projectId}` | GET | Retrieve consent status |
+| `/configurations/{projectId}` | GET | Fetch project configuration and configId |
+| `/vendors/{projectId}` | GET | Fetch vendor list |
+| `/token` | GET | Generate a consent user token |
+| `/consents/{projectId}/cookies/{configId}` | POST | Submit user consent |
+| `/client/{projectId}/consents/{token}?identifier={configId}&service=cookies` | GET | Retrieve consent status |
+| `/auth/me` | GET | Validate bearer token |
 
 ### Consent Payload Structure
 
 ```json
 {
   "accept": true,
+  "token": "flfvv6d974b9jxwd",
   "preferences": {
+    "config": {
+      "language": "en",
+      "identifier": "your_config_id"
+    },
     "vendors": {
       "google_analytics": true,
       "facebook_pixel": false,
       "mixpanel": true
+    },
+    "googleConsentMode": {
+      "version": 2,
+      "ad_storage": "denied",
+      "analytics_storage": "granted",
+      "ad_user_data": "denied",
+      "ad_personalization": "denied"
     }
-  },
-  "token": "demo_user_1234567890",
-  "metadata": {
-    "platform": "react-native",
-    "appVersion": "1.0.0",
-    "timestamp": "2024-01-15T10:00:00Z"
   }
 }
 ```
+> Note: The example app currently places `googleConsentMode` at the top level, which is incorrect. This is tracked as a known issue in internal Axeptio ticket management: MSK-208. The payload shown here is the correct structure.
 
 ## Customization
 
@@ -192,14 +206,11 @@ This is a **demo implementation**. For production, consider:
 
 ```json
 {
-  "expo": "~49.0.0",
-  "react": "18.2.0",
-  "react-native": "0.72.10",
+  "@react-native-async-storage/async-storage": "2.2.0",
+  "expo": "^54.0.22",
+  "react": "19.1.0",
+  "react-native": "0.81.5",
   "react-native-modal": "^13.0.1"
 }
 ```
-
-### Security Note
-
-This demo uses Expo SDK 49 which has known vulnerabilities in its dependencies (semver, send). These are internal to Expo and would require upgrading to Expo SDK 53+ to resolve, which involves breaking changes. For production use, consider upgrading to the latest Expo SDK.
 

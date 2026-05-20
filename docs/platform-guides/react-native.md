@@ -1,9 +1,8 @@
 # React Native Integration Guide
 
-Integrate Axeptio Headless CMP into a React Native or Expo application.
+This guide explains how to integrate the Axeptio Headless CMP API into a React Native or Expo application.
 
-For a runnable demo, see [`examples/react-native/`](../../examples/react-native/).
-For the full API spec, see [API Reference](../api-reference/overview.md).
+The repo includes a working example app at [`examples/react-native/`](../../examples/react-native/) that demonstrates everything covered here. For the platform-agnostic API flow, see [Integration Lifecycle](../getting-started/integration-lifecycle.md).
 
 ---
 
@@ -11,438 +10,356 @@ For the full API spec, see [API Reference](../api-reference/overview.md).
 
 - React Native 0.73+ or Expo SDK 50+
 - Node.js 18+
-- An Axeptio project with API credentials ([dashboard.axept.io](https://dashboard.axept.io))
+- An API token and project ID (see [Get your credentials](../getting-started/credentials.md))
 
-### Required packages
+---
+
+## The example app
+
+The example app is a single-file Expo app (`App.js`) that demonstrates:
+- Fetching configuration and vendors from the API
+- Rendering a custom consent modal with vendor toggles
+- Submitting consent and reading it back
+- Switching between staging and production environments
+- Generating and managing user tokens
+
+To run it:
 
 ```bash
-npm install @react-native-async-storage/async-storage
-npm install @react-native-community/netinfo
-npm install react-native-keychain   # for secure token storage
+cd examples/react-native
+npm install
+npm start
 ```
 
----
+The app uses these dependencies:
 
-## TypeScript Types
-
-```typescript
-interface ConsentPreferences {
-  vendors?: Record<string, boolean>;
-  config?: {
-    name?: string;
-    language?: string;
-    consentMode?: string;
-    mobileContext?: {
-      platform: string;
-      offline: boolean;
-      networkType?: string;
-      syncBatch?: string;
-    };
-  };
-  googleConsentMode?: GoogleConsentMode;
-}
-
-interface ConsentRequest {
-  accept: boolean;
-  token: string;
-  preferences: ConsentPreferences;
-  timestamp?: string;
-  headers?: Record<string, string>;
-  metadata?: {
-    userAgent?: string;
-    language?: string;
-    timestamp?: string;
-  };
-}
-
-interface ConsentResponse {
-  token: string;
-  accept: boolean;
-  preferences: ConsentPreferences;
-  createdAt: string;
-}
-
-interface GoogleConsentMode {
-  version: 2;
-  ad_storage: 'granted' | 'denied';
-  analytics_storage: 'granted' | 'denied';
-  ad_user_data: 'granted' | 'denied';
-  ad_personalization: 'granted' | 'denied';
-  functionality_storage: 'granted' | 'denied';
-  personalization_storage: 'granted' | 'denied';
-  security_storage: 'granted' | 'denied';
-}
-
-interface ProjectConfiguration {
-  id: string;
-  name: string;
-  cookies: Array<{
-    steps: unknown[];
-    vendors: unknown[];
-    language: string;
-  }>;
-  configuration: {
-    websiteURL: string;
-    privacyPolicyURL: string;
-  };
+```json
+{
+  "@react-native-async-storage/async-storage": "2.2.0",
+  "expo": "^54.0.22",
+  "react": "19.1.0",
+  "react-native": "0.81.5",
+  "react-native-modal": "^13.0.1"
 }
 ```
 
+The entire implementation lives in `App.js`. There is no separate SDK, no installable package, and no pre-built components. The app is a reference implementation: read it, understand the API calls, then build your own UI.
+
+> **Known bugs in the example app**: The app has two confirmed issues tracked in Linear. First, `googleConsentMode` is placed at the top level of the consent payload instead of inside `preferences`, which means Google Consent Mode signals are silently dropped by the API (MSK-208, medium). Second, only 4 of the 7 GCM v2 signals are sent; `functionality_storage`, `personalization_storage`, and `security_storage` are missing (MSK-209, low, blocked by MSK-208). Additionally, `accept` is hardcoded to `true` even for rejection flows.
+
 ---
 
-## API Client
+## How the example app calls the API
 
-```typescript
-import NetInfo from '@react-native-community/netinfo';
-import AsyncStorage from '@react-native-async-storage/async-storage';
+The example app follows the same six-step flow described in [Integration Lifecycle](../getting-started/integration-lifecycle.md). Here is how each step maps to the code in `App.js`:
 
-const BASE_URL = 'https://headless-api.axeptio.tech';
+### Fetch configuration
 
-class AxeptioAPIClient {
-  private apiToken: string;
+On mount, the app calls `fetchConfiguration()` to get the `defaultConfigId`:
 
-  constructor(apiToken: string) {
-    this.apiToken = apiToken;
-  }
-
-  private async makeRequest<T>(endpoint: string, options: RequestInit = {}): Promise<T> {
-    const response = await fetch(`${BASE_URL}${endpoint}`, {
-      ...options,
-      headers: {
-        Authorization: `Bearer ${this.apiToken}`,
-        'Content-Type': 'application/json',
-        'x-mobile-platform': 'react-native',
-        ...options.headers,
-      },
-    });
-
-    if (!response.ok) {
-      const netState = await NetInfo.fetch();
-      if (!netState.isConnected) throw new Error('NETWORK_OFFLINE');
-      throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+```javascript
+const response = await fetch(
+  `${apiBase}/configurations/${projectId}`,
+  {
+    headers: {
+      'Accept': 'application/json',
+      'Authorization': `Bearer ${apiToken}`
     }
-
-    return response.json();
   }
-
-  async generateToken(): Promise<string> {
-    const { token } = await this.makeRequest<{ token: string }>('/mobile/token');
-    return token;
-  }
-
-  async getConfiguration(projectId: string): Promise<ProjectConfiguration> {
-    return this.makeRequest(`/mobile/configurations/${projectId}?platform=react-native`);
-  }
-
-  async submitConsent(projectId: string, configId: string, consent: ConsentRequest): Promise<ConsentResponse> {
-    return this.makeRequest(`/mobile/consents/${projectId}/cookies/${configId}`, {
-      method: 'POST',
-      body: JSON.stringify(consent),
-    });
-  }
-
-  async getConsent(projectId: string, token: string): Promise<ConsentResponse> {
-    return this.makeRequest(`/mobile/client/${projectId}/consents/${token}`);
-  }
-}
+);
+const data = await response.json();
+// data.defaultConfigId is stored in state as configId
 ```
 
----
+### Fetch vendors
 
-## ConsentProvider and useConsent Hook
+Also on mount, `fetchVendors()` retrieves the vendor list and builds the consent UI:
 
-Wrap your app in `ConsentProvider` and consume consent state anywhere via `useConsent`.
-
-```typescript
-import React, { useState, useEffect, useContext, createContext } from 'react';
-import { Alert } from 'react-native';
-import AsyncStorage from '@react-native-async-storage/async-storage';
-
-interface ConsentContextType {
-  isLoaded: boolean;
-  hasConsent: boolean;
-  consent: ConsentResponse | null;
-  submitConsent: (preferences: ConsentPreferences) => Promise<boolean>;
-  showConsentDialog: () => void;
-}
-
-const ConsentContext = createContext<ConsentContextType | null>(null);
-
-export const ConsentProvider: React.FC<{
-  projectId: string;
-  configId?: string;
-  apiToken: string;
-  children: React.ReactNode;
-}> = ({ projectId, configId = 'default', apiToken, children }) => {
-  const [isLoaded, setIsLoaded] = useState(false);
-  const [hasConsent, setHasConsent] = useState(false);
-  const [consent, setConsent] = useState<ConsentResponse | null>(null);
-  const [apiClient] = useState(() => new AxeptioAPIClient(apiToken));
-
-  useEffect(() => { loadExistingConsent(); }, []);
-
-  const loadExistingConsent = async () => {
-    try {
-      const stored = await AsyncStorage.getItem(`consent_${projectId}`);
-      if (stored) {
-        const parsed = JSON.parse(stored);
-        setConsent(parsed);
-        setHasConsent(true);
-      }
-
-      const userToken = await AsyncStorage.getItem(`consent_token_${projectId}`);
-      if (userToken) {
-        const apiConsent = await apiClient.getConsent(projectId, userToken);
-        setConsent(apiConsent);
-        setHasConsent(true);
-        await AsyncStorage.setItem(`consent_${projectId}`, JSON.stringify(apiConsent));
-      }
-    } catch (error) {
-      console.warn('Failed to load consent:', error);
-    } finally {
-      setIsLoaded(true);
+```javascript
+const response = await fetch(
+  `${apiBase}/vendors/${projectId}`,
+  {
+    headers: {
+      'Accept': 'application/json',
+      'Authorization': `Bearer ${apiToken}`
     }
-  };
+  }
+);
+const vendorData = await response.json();
+// vendorData.vendors is an array; the app maps it to toggle switches
+```
 
-  const submitConsent = async (preferences: ConsentPreferences): Promise<boolean> => {
-    try {
-      let token = await AsyncStorage.getItem(`consent_token_${projectId}`);
-      if (!token) {
-        token = await apiClient.generateToken();
-        await AsyncStorage.setItem(`consent_token_${projectId}`, token);
-      }
+### Generate a user token
 
-      const request: ConsentRequest = {
-        accept: true,
-        token,
-        preferences,
-        timestamp: new Date().toISOString(),
-      };
+The app calls `fetchToken()` to get a 16-character token from the API:
 
-      const response = await apiClient.submitConsent(projectId, configId, request);
-      setConsent(response);
-      setHasConsent(true);
-      await AsyncStorage.setItem(`consent_${projectId}`, JSON.stringify(response));
-      return true;
-    } catch (error: any) {
-      if (error.message === 'NETWORK_OFFLINE') {
-        await ConsentQueue.enqueue(error._request, projectId);
-        Alert.alert('Offline', 'Your consent will be saved when you reconnect.');
-        return true;
-      }
-      Alert.alert('Error', 'Failed to save consent preferences.');
-      return false;
+```javascript
+const response = await fetch(
+  `${apiBase}/token`,
+  {
+    headers: {
+      'Accept': 'application/json',
+      'Authorization': `Bearer ${apiToken}`
     }
-  };
+  }
+);
+const data = await response.json();
+// data.token is a 16-char lowercase alphanumeric string
+```
 
-  const showConsentDialog = () => {
-    // Navigate to your consent screen or show a modal
-  };
+The token is stored in React state. In a production app, you would store it in secure storage (see [Recommended patterns](#store-tokens-securely) below).
 
-  return (
-    <ConsentContext.Provider value={{ isLoaded, hasConsent, consent, submitConsent, showConsentDialog }}>
-      {children}
-    </ConsentContext.Provider>
-  );
+### Submit consent
+
+The `submitConsent()` function builds the payload and posts it:
+
+```javascript
+const consent = {
+  accept: true,
+  token: tokenToUse,
+  preferences: {
+    config: {
+      language: 'en',
+      identifier: currentConfigId
+    },
+    vendors: vendorPreferences
+  }
 };
 
-export const useConsent = (): ConsentContextType => {
-  const context = useContext(ConsentContext);
-  if (!context) throw new Error('useConsent must be used within ConsentProvider');
-  return context;
-};
-```
-
-### Usage
-
-```typescript
-// App.tsx
-import { ConsentProvider } from './consent/ConsentProvider';
-
-export default function App() {
-  return (
-    <ConsentProvider projectId="YOUR_PROJECT_ID" apiToken="YOUR_API_TOKEN">
-      <MainNavigator />
-    </ConsentProvider>
-  );
-}
-
-// Any screen
-import { useConsent } from './consent/ConsentProvider';
-
-function HomeScreen() {
-  const { isLoaded, hasConsent, submitConsent, showConsentDialog } = useConsent();
-
-  useEffect(() => {
-    if (isLoaded && !hasConsent) showConsentDialog();
-  }, [isLoaded, hasConsent]);
-
-  const handleAcceptAll = () =>
-    submitConsent({ vendors: { google_analytics: true, facebook_pixel: true } });
-
-  return (/* ... */);
-}
-```
-
----
-
-## Offline Queue
-
-Queue consent submissions when the device is offline and replay them on reconnect.
-
-```typescript
-import AsyncStorage from '@react-native-async-storage/async-storage';
-import NetInfo from '@react-native-community/netinfo';
-
-interface QueuedConsent {
-  id: string;
-  consent: ConsentRequest;
-  projectId: string;
-  configId: string;
-  timestamp: number;
-  retryCount: number;
-}
-
-const QUEUE_KEY = 'axeptio_consent_queue';
-
-export const ConsentQueue = {
-  async enqueue(consent: ConsentRequest, projectId: string, configId = 'default'): Promise<void> {
-    const queue = await ConsentQueue.getQueue();
-    queue.push({
-      id: Math.random().toString(36).slice(2),
-      consent,
-      projectId,
-      configId,
-      timestamp: Date.now(),
-      retryCount: 0,
-    });
-    await AsyncStorage.setItem(QUEUE_KEY, JSON.stringify(queue));
-  },
-
-  async getQueue(): Promise<QueuedConsent[]> {
-    const raw = await AsyncStorage.getItem(QUEUE_KEY);
-    return raw ? JSON.parse(raw) : [];
-  },
-
-  async processQueue(apiClient: AxeptioAPIClient): Promise<void> {
-    const queue = await ConsentQueue.getQueue();
-    const failed: QueuedConsent[] = [];
-
-    for (const item of queue) {
-      try {
-        await apiClient.submitConsent(item.projectId, item.configId, item.consent);
-      } catch {
-        if (item.retryCount < 3) {
-          failed.push({ ...item, retryCount: item.retryCount + 1 });
-        }
-      }
-    }
-
-    await AsyncStorage.setItem(QUEUE_KEY, JSON.stringify(failed));
-  },
-};
-
-// In your app startup — replay queue when online
-NetInfo.addEventListener(state => {
-  if (state.isConnected) {
-    ConsentQueue.processQueue(apiClient);
+const response = await fetch(
+  `${apiBase}/consents/${projectId}/cookies/${currentConfigId}`,
+  {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'Accept': 'application/json',
+      'Authorization': `Bearer ${apiToken}`
+    },
+    body: JSON.stringify(consent)
   }
-});
+);
 ```
 
----
+For the full payload schema (required and optional fields), see [Consent Model](../getting-started/consent-model.md).
 
-## Google Consent Mode v2
+### Read consent back
 
-Map Axeptio vendor preferences to Google Consent Mode v2 signals.
+The `checkConsentStatus()` function retrieves stored consent. Note both query parameters are required:
 
-```typescript
-function buildGoogleConsentMode(preferences: ConsentPreferences, region = 'US'): GoogleConsentMode {
-  const isEU = ['AT','BE','BG','HR','CY','CZ','DK','EE','FI','FR','DE','GR','HU',
-    'IE','IT','LV','LT','LU','MT','NL','PL','PT','RO','SK','SI','ES','SE'].includes(region);
-
-  const defaultDenied = isEU ? 'denied' : 'denied';
-  const vendors = preferences.vendors ?? {};
-
-  return {
-    version: 2,
-    ad_storage: vendors.google_ads ? 'granted' : defaultDenied,
-    analytics_storage: vendors.google_analytics ? 'granted' : defaultDenied,
-    ad_user_data: vendors.google_ads ? 'granted' : defaultDenied,
-    ad_personalization: vendors.google_ads ? 'granted' : defaultDenied,
-    functionality_storage: 'granted',
-    personalization_storage: vendors.personalization ? 'granted' : defaultDenied,
-    security_storage: 'granted',
-  };
-}
-
-// Include in your consent submission:
-const preferences: ConsentPreferences = {
-  vendors: { google_analytics: true, google_ads: false },
-  googleConsentMode: buildGoogleConsentMode(
-    { vendors: { google_analytics: true, google_ads: false } },
-    userRegion
-  ),
-};
-```
-
----
-
-## Error Handling
-
-```typescript
-async function safeSubmitConsent(preferences: ConsentPreferences): Promise<void> {
-  try {
-    await submitConsent(preferences);
-  } catch (error: any) {
-    switch (error.message) {
-      case 'NETWORK_OFFLINE':
-        // Already queued — nothing to do
-        break;
-      default:
-        if (error.message.startsWith('HTTP 401')) {
-          // Token invalid — re-authenticate
-        } else if (error.message.startsWith('HTTP 429')) {
-          // Rate limited — back off
-          await new Promise(r => setTimeout(r, 60_000));
-        } else {
-          console.error('Consent submission failed:', error);
-        }
+```javascript
+const response = await fetch(
+  `${apiBase}/client/${projectId}/consents/${lastConsentToken}?identifier=${currentConfigId}&service=cookies`,
+  {
+    headers: {
+      'Accept': 'application/json',
+      'Authorization': `Bearer ${apiToken}`
     }
   }
-}
+);
 ```
+
+See [Identifiers](../getting-started/identifiers.md#which-endpoint-needs-which-identifiers) for which parameters each endpoint requires.
 
 ---
 
-## Secure Token Storage
+## Recommended patterns for production
 
-Store your API token in the device keychain, not in plain AsyncStorage or constants:
+The example app is intentionally simple: everything in one file, tokens in React state, no error recovery. The patterns below are recommendations for production apps. They do not exist in the repo; implement them in your own codebase.
 
-```typescript
+### Store tokens securely
+
+The API token grants full access to your project. In production, store it in the device's secure storage, not in source code or plain AsyncStorage.
+
+Using `react-native-keychain`:
+
+```bash
+npm install react-native-keychain
+```
+
+```javascript
 import * as Keychain from 'react-native-keychain';
 
 const SERVICE = 'AxeptioAPI';
 
-export const SecureStorage = {
-  async storeToken(token: string): Promise<void> {
-    await Keychain.setInternetCredentials(SERVICE, 'api_token', token);
-  },
-  async getToken(): Promise<string | null> {
-    const creds = await Keychain.getInternetCredentials(SERVICE);
-    return creds ? creds.password : null;
-  },
-  async deleteToken(): Promise<void> {
-    await Keychain.resetInternetCredentials(SERVICE);
-  },
+// Store the API token
+await Keychain.setInternetCredentials(SERVICE, 'api_token', yourApiToken);
+
+// Retrieve it
+const credentials = await Keychain.getInternetCredentials(SERVICE);
+const apiToken = credentials ? credentials.password : null;
+
+// Clear on logout
+await Keychain.resetInternetCredentials(SERVICE);
+```
+
+Store the user token (from `GET /mobile/token`) the same way. The user token does not expire, so generate it once per user/device and reuse it.
+
+### Handle the `accept` field correctly
+
+The example app hardcodes `accept: true` for all submissions, even when the user rejects all vendors. In your implementation, set `accept` based on the user's actual choice:
+
+```javascript
+const consent = {
+  accept: hasUserAcceptedAnyVendor,  // true if at least one vendor is accepted
+  token: userToken,
+  preferences: {
+    vendors: vendorPreferences  // { "vendor_key": true/false, ... }
+  }
 };
 ```
 
+Both `accept: true` and `accept: false` are valid. See [Consent Model: accept](../getting-started/consent-model.md#accept).
+
+### Include Google Consent Mode signals
+
+If you use Google products (Analytics, Ads, Tag Manager), include all 7 GCM v2 signals inside `preferences` (not at the top level):
+
+```javascript
+const consent = {
+  accept: true,
+  token: userToken,
+  preferences: {
+    vendors: { google_analytics: true, facebook_pixel: false },
+    googleConsentMode: {
+      version: 2,
+      ad_storage: 'denied',
+      analytics_storage: 'granted',
+      ad_user_data: 'denied',
+      ad_personalization: 'denied',
+      functionality_storage: 'denied',
+      personalization_storage: 'denied',
+      security_storage: 'denied'
+    }
+  }
+};
+```
+
+The `googleConsentMode` object **must** be inside `preferences`. If placed at the top level of the payload, it is silently ignored by the API. See [Consent Model: Google Consent Mode v2](../getting-started/consent-model.md#google-consent-mode-v2).
+
+### Handle errors and retries
+
+The API can return several error codes. A minimal error handler:
+
+```javascript
+async function submitConsentSafely(apiBase, projectId, configId, consent, apiToken) {
+  try {
+    const response = await fetch(
+      `${apiBase}/consents/${projectId}/cookies/${configId}`,
+      {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${apiToken}`
+        },
+        body: JSON.stringify(consent)
+      }
+    );
+
+    if (response.ok) return await response.json();
+
+    if (response.status === 401) {
+      // Token invalid or expired; prompt for re-authentication
+      throw new Error('AUTH_FAILED');
+    }
+    if (response.status === 429) {
+      // Rate limited; retry after the delay
+      const retryAfter = response.headers.get('Retry-After') || 60;
+      throw new Error(`RATE_LIMITED:${retryAfter}`);
+    }
+    throw new Error(`HTTP ${response.status}`);
+  } catch (error) {
+    if (error.message === 'Network request failed') {
+      // Device is offline; queue for later
+      throw new Error('OFFLINE');
+    }
+    throw error;
+  }
+}
+```
+
+### Queue consent submissions offline
+
+When the device has no network, store consent locally and replay when connectivity returns. A simple approach using AsyncStorage and NetInfo:
+
+```bash
+npm install @react-native-community/netinfo
+```
+
+```javascript
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import NetInfo from '@react-native-community/netinfo';
+
+const QUEUE_KEY = 'axeptio_consent_queue';
+
+// Add a consent to the queue
+async function enqueueConsent(consent, projectId, configId) {
+  const raw = await AsyncStorage.getItem(QUEUE_KEY);
+  const queue = raw ? JSON.parse(raw) : [];
+  queue.push({ consent, projectId, configId, timestamp: Date.now(), retries: 0 });
+  await AsyncStorage.setItem(QUEUE_KEY, JSON.stringify(queue));
+}
+
+// Process the queue when online
+async function processQueue(apiBase, apiToken) {
+  const raw = await AsyncStorage.getItem(QUEUE_KEY);
+  if (!raw) return;
+
+  const queue = JSON.parse(raw);
+  const failed = [];
+
+  for (const item of queue) {
+    try {
+      await fetch(
+        `${apiBase}/consents/${item.projectId}/cookies/${item.configId}`,
+        {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${apiToken}`
+          },
+          body: JSON.stringify(item.consent)
+        }
+      );
+    } catch {
+      if (item.retries < 3) {
+        failed.push({ ...item, retries: item.retries + 1 });
+      }
+      // Drop items after 3 retries
+    }
+  }
+
+  await AsyncStorage.setItem(QUEUE_KEY, JSON.stringify(failed));
+}
+
+// Listen for reconnection
+NetInfo.addEventListener(state => {
+  if (state.isConnected) {
+    processQueue(apiBase, apiToken);
+  }
+});
+```
+
+> **Note**: The `POST /mobile/consents/batch` endpoint listed in Swagger is not implemented. To submit multiple queued consents, call the single-consent endpoint for each one.
+
 ---
 
-## Further Reading
+## What this repo is (and is not)
 
-- [API Reference](../api-reference/overview.md) — full endpoint docs with request/response schemas
-- [Authentication Guide](../getting-started/authentication.md) — token lifecycle, error handling
-- [Mobile Integration Reference](./mobile-integration-reference.md) — iOS (Swift) and Android (Kotlin) patterns
-- [Example App](../../examples/react-native/) — runnable Expo demo
+This repo provides an API and a reference implementation. It is not a packaged SDK. There is no `npm install @axeptio/headless-cmp` or equivalent. You integrate by making HTTP calls to the API endpoints and building your own UI.
+
+If you want a pre-built consent UI instead of building your own, Axeptio offers native SDKs that use WebView rendering:
+- iOS: `axeptio-ios-sdk`
+- Android: `axeptio-android-sdk`
+- Flutter: `flutter-sdk`
+
+These are separate products from this headless repo. See [Multi-Platform Overview](./mobile-integration-reference.md) for guidance on choosing between them.
+
+---
+
+## Further reading
+
+- [Integration Lifecycle](../getting-started/integration-lifecycle.md): the six-step API flow
+- [Consent Model](../getting-started/consent-model.md): payload schema, required/optional fields, validation behavior
+- [Identifiers](../getting-started/identifiers.md): projectId, configId, user token, Bearer token
+- [API Reference](../api-reference/overview.md): full endpoint catalog, error codes, rate limits
+- [Example App README](../../examples/react-native/README.md): running the demo, architecture overview

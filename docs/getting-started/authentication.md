@@ -1,428 +1,126 @@
 # Authentication Guide
 
-Comprehensive guide to secure authentication and token management for the Axeptio Headless CMP API.
+How authentication works in the headless CMP API: what tokens exist, how to use them, and how to handle errors.
 
-## Overview
+For how to obtain your credentials, see [Get your credentials](./credentials.md). For a full map of which identifier goes where, see [Identifiers](./identifiers.md).
 
-The Axeptio API uses **Bearer Token Authentication** with JWT (JSON Web Tokens) to secure all endpoints. This guide covers:
+## Two tokens, two jobs
 
-- Token types and lifecycle
-- Secure token storage
-- Authentication best practices
-- Error handling and recovery
+The API uses two different tokens. Think of it like a building pass and a visitor badge: the building pass (Bearer token) gets your app through the door, and the visitor badge (user token) tracks which specific person is inside.
 
-## Authentication Types
+| Token | Purpose | Where it goes | Obtained from |
+|-------|---------|--------------|---------------|
+| Bearer token (API token) | Authenticates your app | `Authorization: Bearer {token}` header | Support request (see [Credentials](./credentials.md)) |
+| User token (consent token) | Identifies a user's consent record | Request body and URL path | `GET /mobile/token` endpoint |
 
-### API Tokens
+Every API request needs the Bearer token. Only consent-related requests need a user token.
 
-**Usage**: Server-to-server authentication and mobile app integration
-**Format**: `Bearer jwt_token_here`
-**Scope**: Project-level access with configurable permissions
-**Lifetime**: Configurable (default: 30 days)
+See [Identifiers](./identifiers.md) for the full breakdown of which endpoint needs which token.
 
-### User Tokens
+## How authentication works
 
-**Usage**: User-specific consent management
-**Format**: String identifier for consent tracking
-**Scope**: User-level consent data
-**Lifetime**: Persistent until user deletion
+Every request must include the Bearer token in the `Authorization` header:
 
-## Getting Your Credentials
+```
+Authorization: Bearer YOUR_API_TOKEN
+```
 
-To get API access, [contact our sales team](https://www.axeptio.eu). Once onboarded, you will receive your **Project ID** and **API Token**.
+The API validates the token on every request. If the token is missing, malformed, or expired, the API returns `401 Unauthorized`.
 
-### Validate an existing token
+### Validate your token
+
+Before building any integration code, confirm your token works:
 
 ```bash
 curl https://headless-api.axeptio.tech/mobile/auth/me \
   -H "Authorization: Bearer YOUR_API_TOKEN"
-# → { "valid": true, "projectId": "...", "tier": "enterprise" }
 ```
 
-### Token Permissions
+Successful response:
 
-Configure access levels for your token:
-
-| Permission           | Description                   | Endpoints                                                                       |
-| -------------------- | ----------------------------- | ------------------------------------------------------------------------------- |
-| **Read Projects**    | Get project configuration     | `GET /mobile/configurations/*`, `GET /mobile/vendors/*`                         |
-| **Manage Consents**  | Collect and retrieve consents | `POST /mobile/consents/*`, `GET /mobile/client/*/consents/*`                    |
-| **Analytics Access** | View consent statistics       | `POST /mobile/analytics/evts`                                                   |
-| **Admin Access**     | Full project management       | All endpoints                                                                   |
-
-## Secure Token Storage
-
-### React Native - Secure Storage
-
-```javascript
-import * as Keychain from "react-native-keychain";
-
-class SecureTokenStorage {
-  static SERVICE_NAME = "AxeptioAPI";
-
-  static async storeToken(token) {
-    try {
-      await Keychain.setInternetCredentials(
-        this.SERVICE_NAME,
-        "api_token",
-        token,
-      );
-      return true;
-    } catch (error) {
-      console.error("Failed to store token:", error);
-      return false;
-    }
-  }
-
-  static async getToken() {
-    try {
-      const credentials = await Keychain.getInternetCredentials(
-        this.SERVICE_NAME,
-      );
-      return credentials ? credentials.password : null;
-    } catch (error) {
-      console.error("Failed to retrieve token:", error);
-      return null;
-    }
-  }
-
-  static async deleteToken() {
-    try {
-      await Keychain.resetInternetCredentials(this.SERVICE_NAME);
-      return true;
-    } catch (error) {
-      console.error("Failed to delete token:", error);
-      return false;
-    }
-  }
-
-  static async hasToken() {
-    const token = await this.getToken();
-    return token !== null;
-  }
+```json
+{
+  "projectId": "507f1f77bcf86cd799439011",
+  "tier": "pro",
+  "authorized": true,
+  "timestamp": "2025-06-01T12:00:00.000Z"
 }
 ```
 
-## API Client Implementation
+Check that `authorized` is `true` and that `projectId` matches your project. If you get a `401`, double-check the `Bearer ` prefix (note the space after "Bearer").
 
-### Base Client with Authentication
+> **Note**: The response field is `authorized`, not `valid`. Some older documentation references `valid`; that is incorrect.
 
-```javascript
-class AxeptioAuthenticatedClient {
-  constructor(baseURL = "https://api.axept.io/v1") {
-    this.baseURL = baseURL;
-    this.tokenStorage = new SecureTokenStorage();
-  }
+## Bearer token expiry
 
-  async getAuthHeaders() {
-    const token = await this.tokenStorage.getToken();
-    if (!token) {
-      throw new AuthenticationError("No API token available");
-    }
+Bearer tokens do expire. The API returns `401 Unauthorized` when a token has expired. There is no refresh endpoint; when your token expires, you need to request a new one through the same support channel you used originally (see [Credentials](./credentials.md)).
 
-    return {
-      Authorization: `Bearer ${token}`,
-      "Content-Type": "application/json",
-      "User-Agent": "AxeptioHeadlessCMP/2.0.0",
-    };
-  }
+> **Open question**: The exact TTL (time-to-live) for Bearer tokens has not been confirmed. If your integration stops working with a `401` after a period of time, token expiry is the likely cause.
 
-  async makeRequest(endpoint, options = {}) {
-    const url = `${this.baseURL}${endpoint}`;
-    const headers = await this.getAuthHeaders();
+## User token lifetime
 
-    try {
-      const response = await fetch(url, {
-        ...options,
-        headers: {
-          ...headers,
-          ...options.headers,
-        },
-      });
+User tokens (the 16-character consent tokens from `GET /mobile/token`) do not expire. There is no TTL or cleanup mechanism in the gateway code. Generate one per user or device, store it, and reuse it for all future consent submissions.
 
-      // Handle authentication errors
-      if (response.status === 401) {
-        await this.handleAuthenticationError();
-        throw new AuthenticationError("Authentication failed");
-      }
+## Secure storage recommendations
 
-      // Handle rate limiting
-      if (response.status === 429) {
-        const retryAfter = response.headers.get("Retry-After");
-        throw new RateLimitError(
-          `Rate limited. Retry after ${retryAfter} seconds`,
-        );
-      }
+The API token grants full access to your project. Treat it like a password.
 
-      if (!response.ok) {
-        throw new APIError(`HTTP ${response.status}: ${response.statusText}`);
-      }
+**Do:**
+- Store in the platform's secure storage (iOS Keychain, Android Keystore, or equivalent)
+- Use environment variables or a `.env` file during development (excluded from git)
+- Clear tokens on logout or app uninstall
 
-      return await response.json();
-    } catch (error) {
-      if (
-        error instanceof AuthenticationError ||
-        error instanceof RateLimitError ||
-        error instanceof APIError
-      ) {
-        throw error;
-      }
-      throw new NetworkError(`Network request failed: ${error.message}`);
-    }
-  }
+**Do not:**
+- Commit tokens to source control
+- Log tokens in console output, analytics, or crash reports
+- Store in plain text files, AsyncStorage, SharedPreferences, or localStorage
+- Pass tokens in URL parameters or form data
 
-  async handleAuthenticationError() {
-    // Clear invalid token
-    await this.tokenStorage.deleteToken();
+For a React Native implementation, the `react-native-keychain` package provides access to iOS Keychain and Android Keystore. See its documentation for usage patterns.
 
-    // Trigger token refresh flow
-    // This should redirect to login or show auth required message
-    this.onAuthenticationRequired?.();
-  }
-}
-```
+## Error handling
 
-## Token Lifecycle Management
+### HTTP status codes
 
-### Token Validation
+| Status | Meaning | What to do |
+|--------|---------|-----------|
+| `200` | Success | Process the response |
+| `401` | Unauthorized | Token is missing, malformed, or expired. Verify format, request a new token if needed |
+| `403` | Forbidden | Token is valid but lacks permission for this endpoint |
+| `404` | Not found | Check the endpoint path and identifiers (projectId, configId, token) |
+| `429` | Rate limited | Wait and retry. Check the `Retry-After` header for the delay |
+| `500` | Server error | Retry with backoff; report if persistent |
 
-```javascript
-class TokenValidator {
-  static validateTokenFormat(token) {
-    // JWT tokens have three parts separated by dots
-    const parts = token.split(".");
-    if (parts.length !== 3) {
-      return false;
-    }
+### Recommended error handling pattern
 
-    try {
-      // Decode header and payload (but don't verify signature - that's server-side)
-      const header = JSON.parse(atob(parts[0]));
-      const payload = JSON.parse(atob(parts[1]));
+When your integration receives a `401`:
 
-      return header.typ === "JWT" && payload.exp && payload.iat;
-    } catch {
-      return false;
-    }
-  }
+1. Stop making API calls
+2. Log the error (without including the token value)
+3. Notify the user or trigger a re-authentication flow
+4. Request a new token if the current one has expired
 
-  static isTokenExpired(token) {
-    try {
-      const payload = JSON.parse(atob(token.split(".")[1]));
-      const now = Math.floor(Date.now() / 1000);
-      return payload.exp < now;
-    } catch {
-      return true;
-    }
-  }
+When your integration receives a `429`:
 
-  static getTokenExpiration(token) {
-    try {
-      const payload = JSON.parse(atob(token.split(".")[1]));
-      return new Date(payload.exp * 1000);
-    } catch {
-      return null;
-    }
-  }
-}
-```
+1. Read the `Retry-After` response header
+2. Wait for the specified duration
+3. Retry the request
+4. If you hit rate limits frequently, reduce your request frequency or batch your operations
 
-### Automatic Token Refresh
+### Network errors
 
-```javascript
-class TokenManager {
-  constructor(tokenStorage) {
-    this.tokenStorage = tokenStorage;
-    this.refreshThreshold = 5 * 60; // Refresh 5 minutes before expiry
-  }
+For production apps, implement retry logic with exponential backoff for network failures. A reasonable starting point: retry up to 3 times, with delays of 1s, 2s, and 4s.
 
-  async getValidToken() {
-    const token = await this.tokenStorage.getToken();
+## Security best practices
 
-    if (!token || !TokenValidator.validateTokenFormat(token)) {
-      throw new AuthenticationError("Invalid or missing token");
-    }
+1. **Always use HTTPS.** The API base URLs (`https://headless-api.axeptio.tech/mobile` and `https://staging-api.axeptio.tech/mobile`) are HTTPS only.
 
-    if (this.shouldRefreshToken(token)) {
-      return await this.refreshToken();
-    }
+2. **Consider certificate pinning** for production mobile apps to prevent man-in-the-middle attacks.
 
-    return token;
-  }
+3. **Set request timeouts.** 30 seconds is a reasonable default for mobile networks.
 
-  shouldRefreshToken(token) {
-    try {
-      const payload = JSON.parse(atob(token.split(".")[1]));
-      const now = Math.floor(Date.now() / 1000);
-      const expiresIn = payload.exp - now;
-
-      return expiresIn < this.refreshThreshold;
-    } catch {
-      return true;
-    }
-  }
-
-  async refreshToken() {
-    // Implement token refresh logic
-    // This might involve calling a refresh endpoint or prompting user to re-authenticate
-    throw new AuthenticationError(
-      "Token refresh required - please re-authenticate",
-    );
-  }
-}
-```
-
-## Error Handling
-
-### Authentication Errors
-
-```javascript
-class AuthenticationError extends Error {
-  constructor(message, code = "AUTH_FAILED") {
-    super(message);
-    this.name = "AuthenticationError";
-    this.code = code;
-  }
-}
-
-class RateLimitError extends Error {
-  constructor(message, retryAfter = null) {
-    super(message);
-    this.name = "RateLimitError";
-    this.retryAfter = retryAfter;
-  }
-}
-
-// Usage in API client
-try {
-  const result = await apiClient.makeRequest("/vault/project/123");
-} catch (error) {
-  if (error instanceof AuthenticationError) {
-    // Handle authentication failure
-    showLoginScreen();
-  } else if (error instanceof RateLimitError) {
-    // Handle rate limiting
-    scheduleRetry(error.retryAfter);
-  } else {
-    // Handle other errors
-    showErrorMessage(error.message);
-  }
-}
-```
-
-## Security Best Practices
-
-### 1. Token Storage
-
-- ✅ **Use secure storage** (Keychain/Keystore/Encrypted SharedPreferences)
-- ✅ **Never log tokens** in console, analytics, or crash reports
-- ✅ **Clear tokens on logout** or app uninstall
-- ❌ **Never store in plain text** files or regular SharedPreferences
-
-### 2. Network Security
-
-- ✅ **Always use HTTPS** for API requests
-- ✅ **Implement certificate pinning** for production apps
-- ✅ **Validate SSL certificates**
-- ❌ **Never disable SSL verification**
-
-### 3. Token Transmission
-
-- ✅ **Use Authorization header** with Bearer prefix
-- ✅ **Include User-Agent** header for tracking
-- ✅ **Set appropriate timeouts** (30 seconds recommended)
-- ❌ **Never include tokens** in URL parameters or form data
-
-### 4. Error Handling
-
-- ✅ **Handle 401 errors** by clearing tokens and prompting re-auth
-- ✅ **Implement exponential backoff** for 429 rate limit errors
-- ✅ **Log errors appropriately** (without exposing tokens)
-- ❌ **Never retry indefinitely** on authentication failures
-
-## Testing Authentication
-
-### Unit Tests
-
-```javascript
-describe("Authentication", () => {
-  it("should store and retrieve tokens securely", async () => {
-    const storage = new SecureTokenStorage();
-    const testToken = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...";
-
-    const stored = await storage.storeToken(testToken);
-    expect(stored).toBe(true);
-
-    const retrieved = await storage.getToken();
-    expect(retrieved).toBe(testToken);
-  });
-
-  it("should handle authentication failures", async () => {
-    const client = new AxeptioAuthenticatedClient();
-
-    // Mock 401 response
-    fetch.mockResolvedValueOnce({
-      ok: false,
-      status: 401,
-      statusText: "Unauthorized",
-    });
-
-    await expect(client.makeRequest("/vault/project/test")).rejects.toThrow(
-      AuthenticationError,
-    );
-  });
-});
-```
-
-### Integration Tests
-
-```javascript
-describe("API Integration", () => {
-  it("should authenticate with valid token", async () => {
-    const client = new AxeptioAuthenticatedClient();
-    await client.tokenStorage.storeToken(process.env.TEST_API_TOKEN);
-
-    const result = await client.makeRequest("/vault/project/test_project_id");
-
-    expect(result).toBeDefined();
-    expect(result.id).toBe("test_project_id");
-  });
-});
-```
-
-## Troubleshooting
-
-### Common Issues
-
-**Issue**: 401 Unauthorized
-**Causes**: Expired token, invalid token format, incorrect project permissions
-**Solution**: Check token validity, ensure proper Bearer format, verify project access
-
-**Issue**: 429 Too Many Requests
-**Causes**: Exceeded rate limits, too many concurrent requests
-**Solution**: Implement exponential backoff, reduce request frequency, batch operations
-
-**Issue**: Token storage fails
-**Causes**: Device security settings, insufficient permissions, storage corruption
-**Solution**: Handle storage errors gracefully, provide fallback authentication flow
-
-**Issue**: Network timeouts
-**Causes**: Poor connectivity, server issues, firewall restrictions
-**Solution**: Implement retry logic, adjust timeout values, add offline support
-
-## Production Checklist
-
-- [ ] API tokens stored securely using platform keychain/keystore
-- [ ] HTTPS enabled for all API requests
-- [ ] Certificate pinning implemented for production
-- [ ] Authentication errors handled gracefully
-- [ ] Token refresh/expiration logic implemented
-- [ ] Rate limiting respected with exponential backoff
-- [ ] Sensitive data excluded from logs and analytics
-- [ ] Network timeout and retry logic implemented
-- [ ] Authentication flow tested on devices
-- [ ] Edge cases handled (no network, expired tokens, etc.)
+4. **Separate staging and production tokens.** Use the staging environment (`https://staging-api.axeptio.tech/mobile`) during development; switch to production for release builds.
 
 ---
 
-**Next Steps**: [API Reference](../api-reference/overview.md) | [React Native Guide](../platform-guides/react-native.md)
+**Related**: [Credentials](./credentials.md) | [Identifiers](./identifiers.md) | [Integration Lifecycle](./integration-lifecycle.md) | [API Reference](../api-reference/overview.md)
