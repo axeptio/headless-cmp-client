@@ -16,6 +16,7 @@ import {
 } from 'react-native';
 import Modal from 'react-native-modal';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import * as WebBrowser from 'expo-web-browser';
 
 // Environment Configuration
 const ENVIRONMENTS = {
@@ -36,11 +37,35 @@ const ENVIRONMENTS = {
 // Default Configuration
 const DEFAULT_PROJECT_ID = '67fcdb2b52ab9a99a5865f4d';
 const DEFAULT_ENVIRONMENT = 'staging';
+// Placeholder for the web page (running the Axeptio web widget) that the app
+// opens in a Custom Tab. Set this to your own checkout/demo URL in Settings.
+const DEFAULT_CHECKOUT_URL = '';
 
 // AsyncStorage Keys
 const STORAGE_KEYS = {
   PROJECT_ID: '@axeptio_project_id',
-  ENVIRONMENT: '@axeptio_environment'
+  ENVIRONMENT: '@axeptio_environment',
+  CHECKOUT_URL: '@axeptio_checkout_url'
+};
+
+// Query-parameter key the Axeptio web widget reads to adopt a shared consent
+// token (see widget-client Token.tsx). Mirrors the native SDK helpers
+// appendAxeptioTokenToURL (iOS) / appendAxeptioToken (Android).
+const AXEPTIO_TOKEN_PARAM = 'axeptio_token';
+
+// Append (or replace) ?axeptio_token=<token> on a URL, preserving existing
+// query params. Idempotent: calling twice does not duplicate the param.
+// Returns the original url unchanged if url or token is missing.
+const appendAxeptioToken = (url, token) => {
+  if (!url || !token) return url;
+  const [base, hash = ''] = url.split('#');
+  const [path, query = ''] = base.split('?');
+  const params = query
+    .split('&')
+    .filter(part => part && part.split('=')[0] !== AXEPTIO_TOKEN_PARAM);
+  params.push(`${AXEPTIO_TOKEN_PARAM}=${encodeURIComponent(token)}`);
+  const rebuilt = `${path}?${params.join('&')}`;
+  return hash ? `${rebuilt}#${hash}` : rebuilt;
 };
 
 // Mock vendors since project config is empty
@@ -67,8 +92,10 @@ export default function App() {
   // Settings state
   const [projectId, setProjectId] = useState(DEFAULT_PROJECT_ID);
   const [environment, setEnvironment] = useState(DEFAULT_ENVIRONMENT);
+  const [checkoutUrl, setCheckoutUrl] = useState(DEFAULT_CHECKOUT_URL);
   const [tempProjectId, setTempProjectId] = useState(DEFAULT_PROJECT_ID);
   const [tempEnvironment, setTempEnvironment] = useState(DEFAULT_ENVIRONMENT);
+  const [tempCheckoutUrl, setTempCheckoutUrl] = useState(DEFAULT_CHECKOUT_URL);
 
   // Derived values
   const apiBase = ENVIRONMENTS[environment]?.url || ENVIRONMENTS[DEFAULT_ENVIRONMENT].url;
@@ -79,6 +106,7 @@ export default function App() {
     try {
       const savedProjectId = await AsyncStorage.getItem(STORAGE_KEYS.PROJECT_ID);
       const savedEnvironment = await AsyncStorage.getItem(STORAGE_KEYS.ENVIRONMENT);
+      const savedCheckoutUrl = await AsyncStorage.getItem(STORAGE_KEYS.CHECKOUT_URL);
 
       if (savedProjectId) {
         setProjectId(savedProjectId);
@@ -88,6 +116,10 @@ export default function App() {
         setEnvironment(savedEnvironment);
         setTempEnvironment(savedEnvironment);
       }
+      if (savedCheckoutUrl !== null) {
+        setCheckoutUrl(savedCheckoutUrl);
+        setTempCheckoutUrl(savedCheckoutUrl);
+      }
 
       console.log('Settings loaded:', { projectId: savedProjectId || DEFAULT_PROJECT_ID, environment: savedEnvironment || DEFAULT_ENVIRONMENT });
     } catch (error) {
@@ -96,11 +128,12 @@ export default function App() {
   };
 
   // Save settings to AsyncStorage
-  const saveSettings = async (newProjectId, newEnvironment) => {
+  const saveSettings = async (newProjectId, newEnvironment, newCheckoutUrl) => {
     try {
       await AsyncStorage.setItem(STORAGE_KEYS.PROJECT_ID, newProjectId);
       await AsyncStorage.setItem(STORAGE_KEYS.ENVIRONMENT, newEnvironment);
-      console.log('Settings saved:', { projectId: newProjectId, environment: newEnvironment });
+      await AsyncStorage.setItem(STORAGE_KEYS.CHECKOUT_URL, newCheckoutUrl);
+      console.log('Settings saved:', { projectId: newProjectId, environment: newEnvironment, checkoutUrl: newCheckoutUrl });
     } catch (error) {
       console.error('Failed to save settings:', error);
       throw error;
@@ -416,6 +449,42 @@ export default function App() {
     }
   };
 
+  // Open the checkout page in a Custom Tab, sharing the consent token so the
+  // Axeptio web widget recognizes the existing consent and does not re-prompt.
+  const openCheckoutWithConsent = async () => {
+    if (!checkoutUrl || checkoutUrl.trim() === '') {
+      Alert.alert(
+        '🛒 No Checkout URL',
+        'Set a Checkout URL in Settings first (a web page that runs the Axeptio web widget).',
+        [{ text: 'OK' }]
+      );
+      return;
+    }
+
+    // The widget only stays hidden if a consent proof already exists for this
+    // token. A fresh token with no submitted consent would still show the widget.
+    if (!lastConsentToken) {
+      Alert.alert(
+        '🛒 Submit Consent First',
+        'No consent submitted yet. Use "Manage Consent" to submit a consent, then reopen the checkout so the shared token resolves to an existing consent.',
+        [{ text: 'OK' }]
+      );
+      return;
+    }
+
+    const target = appendAxeptioToken(checkoutUrl.trim(), lastConsentToken);
+    console.log('=== OPEN CHECKOUT (SHARED TOKEN) ===');
+    console.log('Sharing token:', lastConsentToken);
+    console.log('Custom Tab URL:', target);
+    console.log('====================================');
+
+    try {
+      await WebBrowser.openBrowserAsync(target);
+    } catch (error) {
+      Alert.alert('❌ Error', `Could not open checkout:\n\n${error.message}`);
+    }
+  };
+
   // Check auth status
   const checkAuth = async () => {
     setLoading(true);
@@ -546,6 +615,7 @@ export default function App() {
   const openSettings = () => {
     setTempProjectId(projectId);
     setTempEnvironment(environment);
+    setTempCheckoutUrl(checkoutUrl);
     setSettingsModalVisible(true);
   };
 
@@ -559,9 +629,11 @@ export default function App() {
 
     setLoading(true);
     try {
-      await saveSettings(tempProjectId, tempEnvironment);
+      const trimmedCheckoutUrl = tempCheckoutUrl.trim();
+      await saveSettings(tempProjectId, tempEnvironment, trimmedCheckoutUrl);
       setProjectId(tempProjectId);
       setEnvironment(tempEnvironment);
+      setCheckoutUrl(trimmedCheckoutUrl);
       setSettingsModalVisible(false);
 
       // Reset app state when settings change
@@ -583,6 +655,7 @@ export default function App() {
   const handleCancelSettings = () => {
     setTempProjectId(projectId);
     setTempEnvironment(environment);
+    setTempCheckoutUrl(checkoutUrl);
     setSettingsModalVisible(false);
   };
 
@@ -599,6 +672,7 @@ export default function App() {
           onPress: () => {
             setTempProjectId(DEFAULT_PROJECT_ID);
             setTempEnvironment(DEFAULT_ENVIRONMENT);
+            setTempCheckoutUrl(DEFAULT_CHECKOUT_URL);
           }
         }
       ]
@@ -627,6 +701,8 @@ export default function App() {
         <Text style={styles.infoText}>Environment: {ENVIRONMENTS[environment]?.name || 'Unknown'}</Text>
         <Text style={styles.infoText}>Collection: cookies</Text>
         <Text style={styles.infoText}>User Token: {currentUserToken || 'Loading...'}</Text>
+        <Text style={styles.infoText}>Checkout URL: {checkoutUrl || 'Not set (Settings)'}</Text>
+        <Text style={styles.infoText}>Shared Token: {lastConsentToken || 'Submit consent first'}</Text>
       </View>
 
       <View style={styles.buttonContainer}>
@@ -644,6 +720,14 @@ export default function App() {
           disabled={loading}
         >
           <Text style={styles.secondaryButtonText}>📋 Check Consent Status</Text>
+        </TouchableOpacity>
+
+        <TouchableOpacity
+          style={styles.secondaryButton}
+          onPress={openCheckoutWithConsent}
+          disabled={loading}
+        >
+          <Text style={styles.secondaryButtonText}>🛒 Open Checkout (share consent)</Text>
         </TouchableOpacity>
 
         <TouchableOpacity
@@ -803,6 +887,22 @@ export default function App() {
               autoCapitalize="none"
               autoCorrect={false}
             />
+
+            <Text style={styles.settingLabel}>Checkout URL (web widget page)</Text>
+            <TextInput
+              style={styles.textInput}
+              value={tempCheckoutUrl}
+              onChangeText={setTempCheckoutUrl}
+              placeholder="https://your-site.example/checkout"
+              editable={!loading}
+              autoCapitalize="none"
+              autoCorrect={false}
+              keyboardType="url"
+            />
+            <Text style={styles.settingHint}>
+              Opened in a Custom Tab with ?axeptio_token= appended. Use Production
+              so the shared token resolves against the same consent store.
+            </Text>
 
             <Text style={styles.settingLabel}>Environment</Text>
             <View style={styles.environmentSelector}>
@@ -1094,6 +1194,12 @@ const styles = StyleSheet.create({
     color: '#2c3e50',
     marginBottom: 10,
     marginTop: 20
+  },
+  settingHint: {
+    fontSize: 11,
+    color: '#95a5a6',
+    marginTop: 6,
+    lineHeight: 15
   },
   textInput: {
     backgroundColor: 'white',
