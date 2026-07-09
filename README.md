@@ -97,6 +97,7 @@ const consent = await fetch(
 | [API Reference](./docs/api-reference/overview.md) | Full endpoint catalog, rate limits, error codes |
 | [React Native Guide](./docs/platform-guides/react-native.md) | `useConsent` hook, offline queue, Google Consent Mode |
 | [Mobile Integration Reference](./docs/platform-guides/mobile-integration-reference.md) | Comprehensive multi-platform reference (iOS, Android, RN) |
+| [WebView Consent Sharing](./docs/platform-guides/webview-consent-sharing.md) | Share consent into a Custom Tab / WebView via `?axeptio_token=` so the web widget stays hidden |
 
 ---
 

@@ -1,0 +1,9 @@
+{
+  "expo": {
+    "name": "axeptio-react-native-demo",
+    "slug": "axeptio-react-native-demo",
+    "plugins": [
+      "expo-web-browser"
+    ]
+  }
+}
