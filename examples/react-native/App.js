@@ -473,9 +473,11 @@ export default function App() {
     }
 
     const target = appendAxeptioToken(checkoutUrl.trim(), lastConsentToken);
+    // Mask the token in logs: it is a user identifier, not something to leak via device logs.
+    const maskedToken = `${lastConsentToken.slice(0, 4)}...${lastConsentToken.slice(-2)}`;
     console.log('=== OPEN CHECKOUT (SHARED TOKEN) ===');
-    console.log('Sharing token:', lastConsentToken);
-    console.log('Custom Tab URL:', target);
+    console.log('Sharing token (masked):', maskedToken);
+    console.log('Custom Tab URL:', target.replace(lastConsentToken, maskedToken));
     console.log('====================================');
 
     try {
