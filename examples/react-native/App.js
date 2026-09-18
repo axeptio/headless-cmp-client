@@ -120,6 +120,9 @@ export default function App() {
   // Derived values
   const apiBase = ENVIRONMENTS[environment]?.url || ENVIRONMENTS[DEFAULT_ENVIRONMENT].url;
   const apiToken = `project_${projectId}_test_token`;
+  // Consent can only be submitted with a usable vendor list: the API rejects an
+  // empty preferences.vendors.
+  const canSubmitConsent = !vendorsLoading && !vendorsError && Object.keys(apiVendors).length > 0;
 
   // Load settings from AsyncStorage
   const loadSettings = async () => {
@@ -216,7 +219,11 @@ export default function App() {
 
 
   // Submit consent to API
-  const submitConsent = async (isAcceptAll) => {
+  const submitConsent = async () => {
+    if (!canSubmitConsent) {
+      Alert.alert('❌ Error', 'No vendors are loaded, so there are no choices to submit.');
+      return;
+    }
     setLoading(true);
 
     // Ensure we have a configId
@@ -247,7 +254,7 @@ export default function App() {
     // Build vendor preferences, keyed on the API's vendor `name` slug.
     const vendorPreferences = {};
     Object.keys(apiVendors).forEach(vendorKey => {
-      vendorPreferences[vendorKey] = isAcceptAll || vendors[vendorKey] || false;
+      vendorPreferences[vendorKey] = vendors[vendorKey] || false;
     });
 
     const acceptedKeys = Object.keys(vendorPreferences).filter(key => vendorPreferences[key]);
@@ -301,9 +308,11 @@ export default function App() {
       if (response.ok || response.status === 201) {
         const consentId = parsedData.consentId || parsedData._id || 'saved';
 
-        setConsentStatus(consent.accept
-          ? (isAcceptAll ? '✅ All Accepted' : '⚙️ Custom Preferences')
-          : '🚫 All Rejected');
+        const vendorKeys = Object.keys(vendorPreferences);
+        const allAccepted = vendorKeys.length > 0 && acceptedKeys.length === vendorKeys.length;
+        setConsentStatus(!consent.accept
+          ? '🚫 All Rejected'
+          : allAccepted ? '✅ All Accepted' : '⚙️ Custom Preferences');
         setLastConsentId(consentId);
         Alert.alert(
           '✅ Success',
@@ -386,10 +395,20 @@ export default function App() {
             vendorPreferences[vendorKey] = false; // Default to not accepted
           });
 
+          // An empty list (or entries with no `name` slug) leaves nothing the
+          // user can consent to, and preferences.vendors must not be empty.
+          if (Object.keys(vendorMap).length === 0) {
+            setApiVendors({});
+            setVendors({});
+            setVendorsError('This project returned no usable vendors. Check the project configuration.');
+            setVendorsLoading(false);
+            return null;
+          }
+
           setApiVendors(vendorMap);
           setVendors(vendorPreferences);
           setVendorsError(null);
-          console.log(`Successfully loaded ${vendorData.vendors.length} vendors from API`);
+          console.log(`Successfully loaded ${Object.keys(vendorMap).length} vendors from API`);
           setVendorsLoading(false);
           return vendorMap;
         }
@@ -812,6 +831,9 @@ export default function App() {
             ) : vendorsError ? (
               <View style={styles.vendorLoading}>
                 <Text style={styles.loadingText}>{vendorsError}</Text>
+                <TouchableOpacity onPress={fetchVendors} disabled={loading}>
+                  <Text style={styles.quickActionText}>↻ Retry</Text>
+                </TouchableOpacity>
               </View>
             ) : (
               Object.entries(apiVendors).map(([key, vendor]) => (
@@ -856,10 +878,10 @@ export default function App() {
           </ScrollView>
 
           <View style={styles.quickActions}>
-            <TouchableOpacity onPress={acceptAll} disabled={loading || vendorsLoading}>
+            <TouchableOpacity onPress={acceptAll} disabled={loading || !canSubmitConsent}>
               <Text style={styles.quickActionText}>✓ Accept All</Text>
             </TouchableOpacity>
-            <TouchableOpacity onPress={rejectAll} disabled={loading || vendorsLoading}>
+            <TouchableOpacity onPress={rejectAll} disabled={loading || !canSubmitConsent}>
               <Text style={styles.quickActionText}>✗ Reject All</Text>
             </TouchableOpacity>
           </View>
@@ -867,8 +889,8 @@ export default function App() {
           <View style={styles.modalButtons}>
             <TouchableOpacity
               style={styles.acceptButton}
-              onPress={() => submitConsent(false)}
-              disabled={loading || vendorsLoading}
+              onPress={submitConsent}
+              disabled={loading || !canSubmitConsent}
             >
               {loading ? (
                 <ActivityIndicator color="white" />

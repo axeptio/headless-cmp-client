@@ -28,7 +28,7 @@ Raw OpenAPI specs:
 | Production | `https://headless-api.axeptio.tech` | Live apps, real consent data |
 | Staging | `https://staging-api.axeptio.tech` | Testing, development, experiments |
 
-Every path on this page already starts with `/mobile`, so the base URL is the host only — do not append `/mobile` to it.
+The base URL is the host only. Paths on this page are shown in full, including their prefix — most carry `/mobile`, while `/public/geolocation/{projectId}` and `/api/health` do not. Do not append `/mobile` to the base URL.
 
 > **Warning**: You may encounter `https://api.axept.io/v1` in older examples or external guides. This is the wrong URL for the headless API. Always use the URLs above.
 
@@ -36,7 +36,7 @@ Every path on this page already starts with `/mobile`, so the base URL is the ho
 
 ## Authentication
 
-Every `/mobile/*` endpoint requires a Bearer token in the `Authorization` header:
+Almost every endpoint requires a Bearer token in the `Authorization` header:
 
 ```
 Authorization: Bearer YOUR_API_TOKEN

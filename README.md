@@ -19,8 +19,12 @@ Widget API spec: https://staging-api.axeptio.tech/mobile/swagger/widget.json
 
 ## Endpoint Catalog
 
-Every `/mobile/*` endpoint requires `Authorization: Bearer YOUR_API_TOKEN`.
-Base URL: `https://headless-api.axeptio.tech` (paths below already include `/mobile`).
+Every endpoint in the table below requires `Authorization: Bearer YOUR_API_TOKEN`, except
+`/public/geolocation/{projectId}`. The documentation routes (`/mobile/docs`,
+`/mobile/swagger.json`), `/mobile/changelog` and `/api/health` are also unauthenticated.
+
+Base URL: `https://headless-api.axeptio.tech`. Paths are shown in full, including their
+`/mobile` or `/public` prefix.
 
 | Method | Path | Description |
 |--------|------|-------------|
