@@ -69,25 +69,38 @@ curl https://headless-api.axeptio.tech/mobile/configurations/507f1f77bcf86cd7994
 ```json
 {
   "projectId": "507f1f77bcf86cd799439011",
+  "primaryColor": "#013974",
+  "isDomainRestrictionEnabled": false,
+  "verifiedDomains": [],
   "configurations": [
     {
-      "identifier": "my-config-en",
-      "name": "English Configuration",
+      "identifier": "6859079473219bcbb8435079",
+      "name": "en-gb-config",
       "title": "Cookie Preferences",
       "language": "en",
       "country": "GB",
+      "flowType": "brands",
+      "policyUrl": null,
+      "cookieStatementUrl": null,
       "isDefault": true
     },
     {
-      "identifier": "my-config-fr",
-      "name": "French Configuration",
+      "identifier": "68c3c4fc2118dc73fbe8c84a",
+      "name": "fr-fr-config",
       "title": "Préférences relatives aux cookies",
       "language": "fr",
       "country": "FR",
+      "flowType": "brands",
+      "policyUrl": null,
+      "cookieStatementUrl": null,
       "isDefault": false
     }
   ],
-  "defaultConfigId": "my-config-en"
+  "defaultConfigId": "6859079473219bcbb8435079",
+  "screens": {
+    "att": { "background": ["#E9CBFF", "#FFCCCD"], "media": null, "title": "…", "description": "…" },
+    "permissions": { "background": ["#FFF8CC", "#CCF6FF"], "media": null, "title": "…", "description": "…" }
+  }
 }
 ```
 
@@ -119,16 +132,20 @@ curl https://headless-api.axeptio.tech/mobile/vendors/507f1f77bcf86cd799439011 \
   "projectId": "507f1f77bcf86cd799439011",
   "vendors": [
     {
-      "id": "google_analytics",
-      "name": "Google Analytics",
+      "id": "674475bd56e4d7163746ace3",
+      "name": "google_analytics",
+      "title": "Google Analytics",
       "description": "Measures website usage",
-      "category": "analytics"
+      "category": "analytics",
+      "type": "analytics"
     },
     {
-      "id": "facebook_pixel",
-      "name": "Facebook Pixel",
+      "id": "62fd02d250c4539d3456e352",
+      "name": "facebook_pixel",
+      "title": "Facebook Pixel",
       "description": "Enables ads and analytics on Facebook",
-      "category": "advertising"
+      "category": "advertising",
+      "type": "advertising"
     }
   ],
   "totalVendors": 2,
@@ -137,11 +154,13 @@ curl https://headless-api.axeptio.tech/mobile/vendors/507f1f77bcf86cd799439011 \
 }
 ```
 
-**What to check**: The response contains vendors. Build your UI with toggles for each vendor ID.
+**What to check**: The response contains vendors. Build your UI with a toggle per vendor, keyed on the vendor's `name` slug — that is the key the consent payload expects, not `id`.
 
 **What you get for step 4**: The vendor list (cache it or use it to validate user choices in step 5).
 
 **Note**: This step is optional if you're using a pre-built UI. If you're building custom UI, you need this data.
+
+**Multi-region apps**: instead of `defaultConfigId`, call [`GET /mobile/geolocation/{projectId}`](../api-reference/geolocation.md) first. It resolves the visitor's country and the applicable regulation, returns the `configId` to use, and hands you the exact vendors path to call next.
 
 ---
 
@@ -198,7 +217,7 @@ curl https://headless-api.axeptio.tech/mobile/token \
 **cURL example**:
 
 ```bash
-curl -X POST https://headless-api.axeptio.tech/mobile/consents/507f1f77bcf86cd799439011/cookies/my-config-en \
+curl -X POST https://headless-api.axeptio.tech/mobile/consents/507f1f77bcf86cd799439011/cookies/6859079473219bcbb8435079 \
   -H "Authorization: Bearer YOUR_API_TOKEN" \
   -H "Content-Type: application/json" \
   -d '{
@@ -217,8 +236,8 @@ curl -X POST https://headless-api.axeptio.tech/mobile/consents/507f1f77bcf86cd79
 
 ```json
 {
-  "consentId": "507f1f77bcf86cd799439012",
-  "_id": "507f1f77bcf86cd799439012",
+  "consentId": "01a0b37b-3621-7913-bd50-7a37b56816e7",
+  "_id": "01a0b37b-3621-7913-bd50-7a37b56816e7",
   "projectId": "507f1f77bcf86cd799439011",
   "createdAt": "2025-06-01T12:05:00.000Z",
   "headers": {
@@ -228,7 +247,7 @@ curl -X POST https://headless-api.axeptio.tech/mobile/consents/507f1f77bcf86cd79
   },
   "accept": true,
   "collection": "cookies",
-  "identifier": "my-config-en",
+  "identifier": "6859079473219bcbb8435079",
   "token": "flfvv6d974b9jxwd",
   "value": null,
   "preferences": {
@@ -263,7 +282,7 @@ curl -X POST https://headless-api.axeptio.tech/mobile/consents/507f1f77bcf86cd79
 **cURL example**:
 
 ```bash
-curl "https://headless-api.axeptio.tech/mobile/client/507f1f77bcf86cd799439011/consents/flfvv6d974b9jxwd?identifier=my-config-en&service=cookies" \
+curl "https://headless-api.axeptio.tech/mobile/client/507f1f77bcf86cd799439011/consents/flfvv6d974b9jxwd?identifier=6859079473219bcbb8435079&service=cookies" \
   -H "Authorization: Bearer YOUR_API_TOKEN"
 ```
 
@@ -271,13 +290,16 @@ curl "https://headless-api.axeptio.tech/mobile/client/507f1f77bcf86cd799439011/c
 
 ```json
 {
-  "consentId": "507f1f77bcf86cd799439012",
+  "_id": "01a0b37b-3621-7913-bd50-7a37b56816e7",
   "projectId": "507f1f77bcf86cd799439011",
   "createdAt": "2025-06-01T12:05:00.000Z",
+  "timestamp": "2025-06-01T12:05:00.000Z",
   "accept": true,
   "collection": "cookies",
-  "identifier": "my-config-en",
+  "identifier": "6859079473219bcbb8435079",
   "token": "flfvv6d974b9jxwd",
+  "value": null,
+  "headers": { "ip": "203.0.113.45", "country": "GB", "userAgent": "..." },
   "preferences": {
     "vendors": {
       "google_analytics": true,

@@ -33,12 +33,19 @@ The clients interact with the Axeptio mobile API:
 headless-cmp-client/
 ├── docs/
 │   ├── api-reference/
-│   │   └── overview.md          # Full endpoint catalog, rate limits, error codes
+│   │   ├── overview.md          # Full endpoint catalog, rate limits, error codes
+│   │   ├── geolocation.md       # /mobile/geolocation + /public/geolocation
+│   │   └── terms.md             # Terms & Conditions content, PDF, `terms` collection
 │   ├── getting-started/
 │   │   ├── quick-start.md       # 5-minute integration guide
-│   │   └── authentication.md    # Bearer tokens, secure storage, error handling
+│   │   ├── credentials.md       # Obtaining and validating the API token
+│   │   ├── authentication.md    # Bearer tokens, secure storage, error handling
+│   │   ├── identifiers.md       # projectId, configId, user token, bearer token
+│   │   ├── consent-model.md     # Consent payload and response schema
+│   │   └── integration-lifecycle.md  # Six-step flow with cURL per step
 │   └── platform-guides/
-│       ├── react-native.md      # useConsent hook, offline queue, Google Consent Mode
+│       ├── react-native.md      # Example-app walkthrough, secure storage, retries
+│       ├── webview-consent-sharing.md  # Share consent via ?axeptio_token=
 │       └── mobile-integration-reference.md  # Multi-platform reference (iOS/Android/RN)
 └── examples/
     └── react-native/            # Working Expo demo with consent modal
