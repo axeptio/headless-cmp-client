@@ -13,19 +13,19 @@ The API uses two different tokens. Think of it like a building pass and a visito
 | Bearer token (API token) | Authenticates your app | `Authorization: Bearer {token}` header | Support request (see [Credentials](./credentials.md)) |
 | User token (consent token) | Identifies a user's consent record | Request body and URL path | `GET /mobile/token` endpoint |
 
-Every API request needs the Bearer token. Only consent-related requests need a user token.
+Every API request that returns your project's data needs the Bearer token. Only consent-related requests need a user token. The public routes are the exception: `GET /public/geolocation/{projectId}` (and its `.js` variant), `GET /mobile/changelog`, the documentation routes (`/mobile/docs`, `/mobile/swagger.json`) and `GET /api/health` take no token.
 
 See [Identifiers](./identifiers.md) for the full breakdown of which endpoint needs which token.
 
 ## How authentication works
 
-Every request must include the Bearer token in the `Authorization` header:
+Requests to the authenticated endpoints must include the Bearer token in the `Authorization` header:
 
 ```
 Authorization: Bearer YOUR_API_TOKEN
 ```
 
-The API validates the token on every request. If the token is missing, malformed, or expired, the API returns `401 Unauthorized`.
+The API validates the token on every authenticated request. If the token is missing, malformed, or expired, the API returns `401 Unauthorized`.
 
 ### Validate your token
 
