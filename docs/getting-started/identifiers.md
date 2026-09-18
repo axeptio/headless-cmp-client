@@ -7,7 +7,7 @@ The headless API uses several identifiers across its endpoints. This page explai
 | Identifier | What it is | Format | Where it comes from |
 |------------|-----------|--------|-------------------|
 | `projectId` | Your project's unique ID | 24-char hex (e.g. `507f1f77bcf86cd799439011`) | Available when you create a new project in the admin panel (no subscription required) |
-| `configId` | A configuration within your project | String identifier (e.g. `my-config-en`) | From `defaultConfigId` in the `GET /mobile/configurations/{projectId}` response |
+| `configId` | A configuration within your project | 24-character hex string (e.g. `6859079473219bcbb8435079`) | From `defaultConfigId` in the `GET /mobile/configurations/{projectId}` response |
 | User token | Identifies a user's consent record | 16-char lowercase alphanumeric (e.g. `flfvv6d974b9jxwd`) | Generated via `GET /mobile/token` |
 | Bearer token (API token) | Authenticates your API requests | Long string, passed in the `Authorization` header | Requested from support (see [Credentials](./credentials.md)) |
 
@@ -57,15 +57,16 @@ Response:
   "projectId": "507f1f77bcf86cd799439011",
   "configurations": [
     {
-      "identifier": "my-config-en",
-      "name": "English Configuration",
+      "identifier": "6859079473219bcbb8435079",
+      "name": "en-gb-config",
+      "flowType": "brands",
       "title": "Cookie Preferences",
       "language": "en",
       "country": "GB",
       "isDefault": true
     }
   ],
-  "defaultConfigId": "my-config-en"
+  "defaultConfigId": "6859079473219bcbb8435079"
 }
 ```
 

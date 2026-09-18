@@ -59,14 +59,14 @@ Check for:
 
 If you get a `401`, double-check that your header uses the exact format `Authorization: Bearer YOUR_API_TOKEN` (with a space after "Bearer").
 
-> **Note**: The response field is `authorized`, not `valid`. Some older documentation may reference `valid`; that is incorrect.
+> **Note**: The response field is `authorized`, not `valid`. The published OpenAPI spec says `valid`; that is a spec bug, verified against the live API.
 
 ## Environments
 
 | Environment | Base URL | When to use |
 |-------------|----------|-------------|
-| Production | `https://headless-api.axeptio.tech/mobile` | Live apps, real consent data |
-| Staging | `https://staging-api.axeptio.tech/mobile` | Testing, development, experiments |
+| Production | `https://headless-api.axeptio.tech` | Live apps, real consent data |
+| Staging | `https://staging-api.axeptio.tech` | Testing, development, experiments |
 
 Both environments have Swagger UI for interactive testing:
 

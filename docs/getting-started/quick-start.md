@@ -152,6 +152,11 @@ Full endpoint reference: [API Reference](../api-reference/overview.md)
 
 **Empty response on consent retrieval**: The `service` and `identifier` query parameters are both required. Without them, the endpoint will not return the expected data.
 
+**Consent saved but the user is asked again**: the keys in `preferences.vendors` must be the vendor
+`name` slugs from `GET /mobile/vendors/{projectId}` (e.g. `googletagmanager`), not the 24-hex `id`
+and not a display title. The API accepts anything and returns `200`, but nothing else on the
+platform will recognise the choices. See [Consent Model](./consent-model.md#preferencesvendors).
+
 **Network timeout**: Add retry logic with exponential backoff for production apps.
 
 ---

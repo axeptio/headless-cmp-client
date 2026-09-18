@@ -34,6 +34,9 @@ const ENVIRONMENTS = {
   }
 };
 
+// Reported to the API as headers['x-app-version'] on consent submissions.
+const APP_VERSION = '1.0.0';
+
 // Default Configuration
 const DEFAULT_PROJECT_ID = '67fcdb2b52ab9a99a5865f4d';
 const DEFAULT_ENVIRONMENT = 'staging';
@@ -68,11 +71,27 @@ const appendAxeptioToken = (url, token) => {
   return hash ? `${rebuilt}#${hash}` : rebuilt;
 };
 
-// Mock vendors since project config is empty
-const VENDORS = {
-  google_analytics: { name: 'Google Analytics', description: 'Usage statistics and analytics' },
-  facebook_pixel: { name: 'Facebook Pixel', description: 'Ad targeting and conversion tracking' },
-  mixpanel: { name: 'Mixpanel', description: 'Product analytics and user behavior' }
+// Google Consent Mode v2 signals, and which vendor types grant each one.
+// `security_storage` is strictly necessary and always granted.
+const GCM_SIGNAL_TYPES = {
+  analytics_storage: ['analytics'],
+  ad_storage: ['advertising', 'ads', 'targeted_ads', 'retargeting', 'conversion'],
+  ad_user_data: ['advertising', 'ads', 'targeted_ads', 'retargeting', 'conversion'],
+  ad_personalization: ['advertising', 'ads', 'targeted_ads', 'retargeting', 'personalization'],
+  functionality_storage: ['functional', 'tag_management', 'cdn', 'integration'],
+  personalization_storage: ['personalization', 'content_personalization'],
+};
+
+// Builds the Google Consent Mode v2 block from the accepted vendors' types.
+const buildGoogleConsentMode = (apiVendors, acceptedKeys) => {
+  const acceptedTypes = acceptedKeys
+    .flatMap(key => apiVendors[key]?.types || [])
+    .map(type => type.trim().toLowerCase());
+  const signals = { version: 2, security_storage: 'granted' };
+  Object.entries(GCM_SIGNAL_TYPES).forEach(([signal, types]) => {
+    signals[signal] = acceptedTypes.some(t => types.some(w => t.includes(w))) ? 'granted' : 'denied';
+  });
+  return signals;
 };
 
 export default function App() {
@@ -80,8 +99,9 @@ export default function App() {
   const [settingsModalVisible, setSettingsModalVisible] = useState(false);
   const [loading, setLoading] = useState(false);
   const [vendorsLoading, setVendorsLoading] = useState(true);
+  const [vendorsError, setVendorsError] = useState(null);
   const [vendors, setVendors] = useState({}); // Dynamic vendor preferences
-  const [apiVendors, setApiVendors] = useState(VENDORS); // Fallback to hardcoded initially
+  const [apiVendors, setApiVendors] = useState({}); // Populated from GET /mobile/vendors/{projectId}
   const [failedImages, setFailedImages] = useState(new Set()); // Track failed image loads
   const [consentStatus, setConsentStatus] = useState('Not Set');
   const [lastConsentId, setLastConsentId] = useState(null);
@@ -224,31 +244,32 @@ export default function App() {
       }
     }
     
-    // Build vendor preferences dynamically
+    // Build vendor preferences, keyed on the API's vendor `name` slug.
     const vendorPreferences = {};
     Object.keys(apiVendors).forEach(vendorKey => {
-      const vendor = apiVendors[vendorKey];
-      const formattedKey = `${vendor.id} (${vendor.name})`;
-      vendorPreferences[formattedKey] = isAcceptAll || vendors[vendorKey] || false;
+      vendorPreferences[vendorKey] = isAcceptAll || vendors[vendorKey] || false;
     });
 
+    const acceptedKeys = Object.keys(vendorPreferences).filter(key => vendorPreferences[key]);
+
     const consent = {
-      accept: true,
+      // `accept` reflects what the user actually chose, not the button they pressed.
+      accept: acceptedKeys.length > 0,
+      token: tokenToUse,
+      timestamp: new Date().toISOString(),
+      headers: {
+        'x-mobile-platform': 'react-native',
+        'x-app-version': APP_VERSION
+      },
       preferences: {
         config: {
           language: 'en',
           identifier: currentConfigId
         },
-        vendors: vendorPreferences
-      },
-      googleConsentMode: {
-        version: 2,
-        ad_storage: 'denied',
-        ad_user_data: 'denied',
-        analytics_storage: 'denied',
-        ad_personalization: 'denied'
-      },
-      token: tokenToUse
+        vendors: vendorPreferences,
+        // Must live inside `preferences` — at the top level it is silently ignored.
+        googleConsentMode: buildGoogleConsentMode(apiVendors, acceptedKeys)
+      }
     };
 
     // Store the token for later consent reading
@@ -278,15 +299,11 @@ export default function App() {
       }
 
       if (response.ok || response.status === 201) {
-        // Try to find the consent ID in various possible fields
-        const consentId = parsedData.id ||
-                         parsedData._id ||
-                         parsedData.consentId ||
-                         parsedData.uuid ||
-                         parsedData.insertedId ||
-                         'saved';
+        const consentId = parsedData.consentId || parsedData._id || 'saved';
 
-        setConsentStatus(isAcceptAll ? '✅ All Accepted' : '⚙️ Custom Preferences');
+        setConsentStatus(consent.accept
+          ? (isAcceptAll ? '✅ All Accepted' : '⚙️ Custom Preferences')
+          : '🚫 All Rejected');
         setLastConsentId(consentId);
         Alert.alert(
           '✅ Success',
@@ -354,40 +371,39 @@ export default function App() {
           const vendorPreferences = {};
 
           vendorData.vendors.forEach(vendor => {
-            const vendorKey = `${vendor.id} (${vendor.title || vendor.name})`;
+            // The consent store matches on the vendor's `name` slug, not its `id`
+            // and not its display title. Sending anything else records a consent
+            // that the rest of the platform cannot recognise.
+            const vendorKey = vendor.name;
+            if (!vendorKey) return;
             vendorMap[vendorKey] = {
               id: vendor.id,
-              name: vendor.title || vendor.name,
+              title: vendor.title || vendor.name,
               description: vendor.description || 'No description available',
+              types: (vendor.type || '').split(',').filter(Boolean),
               image: vendor.image
             };
             vendorPreferences[vendorKey] = false; // Default to not accepted
-
           });
 
           setApiVendors(vendorMap);
           setVendors(vendorPreferences);
+          setVendorsError(null);
           console.log(`Successfully loaded ${vendorData.vendors.length} vendors from API`);
           setVendorsLoading(false);
           return vendorMap;
         }
       } else {
         console.warn(`Failed to fetch vendors: ${response.status} ${response.statusText}`);
-        // Fallback to hardcoded vendors
-        const hardcodedPreferences = Object.keys(VENDORS).reduce((acc, key) => ({
-          ...acc,
-          [key]: false
-        }), {});
-        setVendors(hardcodedPreferences);
+        setApiVendors({});
+        setVendors({});
+        setVendorsError(`Could not load vendors (HTTP ${response.status}).`);
       }
     } catch (error) {
       console.error('Failed to fetch vendors:', error);
-      // Fallback to hardcoded vendors on error
-      const hardcodedPreferences = Object.keys(VENDORS).reduce((acc, key) => ({
-        ...acc,
-        [key]: false
-      }), {});
-      setVendors(hardcodedPreferences);
+      setApiVendors({});
+      setVendors({});
+      setVendorsError(`Could not load vendors: ${error.message}`);
     } finally {
       setVendorsLoading(false);
     }
@@ -793,6 +809,10 @@ export default function App() {
                 <ActivityIndicator size="large" color="#32C832" />
                 <Text style={styles.loadingText}>Loading vendors...</Text>
               </View>
+            ) : vendorsError ? (
+              <View style={styles.vendorLoading}>
+                <Text style={styles.loadingText}>{vendorsError}</Text>
+              </View>
             ) : (
               Object.entries(apiVendors).map(([key, vendor]) => (
                 <View key={key} style={styles.vendorItem}>
@@ -814,12 +834,12 @@ export default function App() {
                     {((vendor.image?.optimized?.small || vendor.image?.optimized?.medium || vendor.image?.fallbackUrl) && failedImages.has(key)) && (
                       <View style={[styles.vendorLogo, styles.vendorLogoPlaceholder]}>
                         <Text style={styles.vendorLogoText}>
-                          {vendor.name.charAt(0).toUpperCase()}
+                          {vendor.title.charAt(0).toUpperCase()}
                         </Text>
                       </View>
                     )}
                     <View style={styles.vendorInfo}>
-                      <Text style={styles.vendorName}>{vendor.name}</Text>
+                      <Text style={styles.vendorName}>{vendor.title}</Text>
                       <Text style={styles.vendorDesc}>{vendor.description}</Text>
                     </View>
                     <Switch
@@ -1161,12 +1181,6 @@ const styles = StyleSheet.create({
   },
   acceptButton: {
     backgroundColor: '#32C832',
-    padding: 15,
-    borderRadius: 8,
-    alignItems: 'center'
-  },
-  saveButton: {
-    backgroundColor: '#7f8c8d',
     padding: 15,
     borderRadius: 8,
     alignItems: 'center'
