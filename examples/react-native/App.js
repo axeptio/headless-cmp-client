@@ -361,6 +361,21 @@ export default function App() {
   // Fetch vendors from API
   const fetchVendors = async () => {
     setVendorsLoading(true);
+    // Clear first: a project or environment change must never leave the previous
+    // project's vendors selectable while the new list loads, or if it fails.
+    setApiVendors({});
+    setVendors({});
+    setVendorsError(null);
+
+    // Every failure funnels through here, so no path can leave the modal blank
+    // but error-free — which would look loaded with nothing to consent to.
+    const fail = (message) => {
+      setApiVendors({});
+      setVendors({});
+      setVendorsError(message);
+      return null;
+    };
+
     try {
       const response = await fetch(
         `${apiBase}/vendors/${projectId}`,
@@ -372,61 +387,53 @@ export default function App() {
         }
       );
 
-      if (response.ok) {
-        const vendorData = await response.json();
-        if (vendorData && vendorData.vendors && Array.isArray(vendorData.vendors)) {
-          // Transform API response with simplified vendor data
-          const vendorMap = {};
-          const vendorPreferences = {};
-
-          vendorData.vendors.forEach(vendor => {
-            // The consent store matches on the vendor's `name` slug, not its `id`
-            // and not its display title. Sending anything else records a consent
-            // that the rest of the platform cannot recognise.
-            const vendorKey = vendor.name;
-            if (!vendorKey) return;
-            vendorMap[vendorKey] = {
-              id: vendor.id,
-              title: vendor.title || vendor.name,
-              description: vendor.description || 'No description available',
-              types: (vendor.type || '').split(',').filter(Boolean),
-              image: vendor.image
-            };
-            vendorPreferences[vendorKey] = false; // Default to not accepted
-          });
-
-          // An empty list (or entries with no `name` slug) leaves nothing the
-          // user can consent to, and preferences.vendors must not be empty.
-          if (Object.keys(vendorMap).length === 0) {
-            setApiVendors({});
-            setVendors({});
-            setVendorsError('This project returned no usable vendors. Check the project configuration.');
-            setVendorsLoading(false);
-            return null;
-          }
-
-          setApiVendors(vendorMap);
-          setVendors(vendorPreferences);
-          setVendorsError(null);
-          console.log(`Successfully loaded ${Object.keys(vendorMap).length} vendors from API`);
-          setVendorsLoading(false);
-          return vendorMap;
-        }
-      } else {
+      if (!response.ok) {
         console.warn(`Failed to fetch vendors: ${response.status} ${response.statusText}`);
-        setApiVendors({});
-        setVendors({});
-        setVendorsError(`Could not load vendors (HTTP ${response.status}).`);
+        return fail(`Could not load vendors (HTTP ${response.status}).`);
       }
+
+      const vendorData = await response.json();
+      if (!vendorData || !Array.isArray(vendorData.vendors)) {
+        console.warn('Unexpected vendors response shape:', vendorData);
+        return fail('The vendors endpoint returned an unexpected response.');
+      }
+
+      const vendorMap = {};
+      const vendorPreferences = {};
+
+      vendorData.vendors.forEach(vendor => {
+        // The consent store matches on the vendor's `name` slug, not its `id`
+        // and not its display title. Sending anything else records a consent
+        // that the rest of the platform cannot recognise.
+        const vendorKey = vendor.name;
+        if (!vendorKey) return;
+        vendorMap[vendorKey] = {
+          id: vendor.id,
+          title: vendor.title || vendor.name,
+          description: vendor.description || 'No description available',
+          types: (vendor.type || '').split(',').filter(Boolean),
+          image: vendor.image
+        };
+        vendorPreferences[vendorKey] = false; // Default to not accepted
+      });
+
+      // An empty list (or entries with no `name` slug) leaves nothing the user
+      // can consent to, and preferences.vendors must not be empty.
+      if (Object.keys(vendorMap).length === 0) {
+        return fail('This project returned no usable vendors. Check the project configuration.');
+      }
+
+      setApiVendors(vendorMap);
+      setVendors(vendorPreferences);
+      setVendorsError(null);
+      console.log(`Successfully loaded ${Object.keys(vendorMap).length} vendors from API`);
+      return vendorMap;
     } catch (error) {
       console.error('Failed to fetch vendors:', error);
-      setApiVendors({});
-      setVendors({});
-      setVendorsError(`Could not load vendors: ${error.message}`);
+      return fail(`Could not load vendors: ${error.message}`);
     } finally {
       setVendorsLoading(false);
     }
-    return null;
   };
 
   // Fetch a new user token from the API

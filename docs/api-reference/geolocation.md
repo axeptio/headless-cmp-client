@@ -92,7 +92,13 @@ GET /public/geolocation/{projectId}.js
 
 The same resolution with **no `Authorization` header** and **no rate limiting**, for contexts that
 cannot hold a credential — a Google Tag Manager template, a landing page, a pre-login screen. The
-`.js` form returns an `application/javascript` settings snippet for the Axeptio GTM template.
+`.js` form returns an `application/javascript` settings snippet for the Axeptio GTM template:
+
+```js
+window.axeptioSettings = window.axeptioSettings || {};
+window.axeptioSettings.cookiesVersion = "67fcddc2673e895f81feb6c3";
+window.axeptioSettings.flowType = "brands";
+```
 
 Note the different, flatter shape: `flowType` and `configId` are at the top level, and there is no
 `next` block.

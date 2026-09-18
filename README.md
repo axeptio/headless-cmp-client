@@ -20,8 +20,9 @@ Widget API spec: https://staging-api.axeptio.tech/mobile/swagger/widget.json
 ## Endpoint Catalog
 
 Every endpoint in the table below requires `Authorization: Bearer YOUR_API_TOKEN`, except
-`/public/geolocation/{projectId}`. The documentation routes (`/mobile/docs`,
-`/mobile/swagger.json`), `/mobile/changelog` and `/api/health` are also unauthenticated.
+`/public/geolocation/{projectId}` and its `.js` settings-snippet variant. The documentation routes
+(`/mobile/docs`, `/mobile/swagger.json`), `/mobile/changelog` and `/api/health` are also
+unauthenticated.
 
 Base URL: `https://headless-api.axeptio.tech`. Paths are shown in full, including their
 `/mobile` or `/public` prefix.
@@ -38,7 +39,7 @@ Base URL: `https://headless-api.axeptio.tech`. Paths are shown in full, includin
 | `GET` | `/mobile/vendors/{projectId}/{configId}` | Config-specific vendor list |
 | `GET` | `/mobile/vendors/{projectId}/{configId}/categories` | Purpose-step categories for a configuration |
 | `GET` | `/mobile/geolocation/{projectId}` | Resolve country, regulation and applicable config |
-| `GET` | `/public/geolocation/{projectId}` | Same, unauthenticated |
+| `GET` | `/public/geolocation/{projectId}` | Same, unauthenticated (`.js` variant returns a GTM settings snippet) |
 | `GET` | `/mobile/terms/{projectId}/{configId}` | Terms & Conditions content (`/pdf` for the PDF) |
 | `POST` | `/mobile/analytics/evts` | Submit analytics events (single or batch) |
 | `GET` | `/mobile/health` | Service health (Bearer required; use `GET /api/health` unauthenticated) |
