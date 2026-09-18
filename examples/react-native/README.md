@@ -96,12 +96,20 @@ The demo includes 3 mock vendors (since the project config is empty):
 2. **Check Status** - Retrieves current consent from API
 3. **Accept All** - Grants consent for all vendors
 4. **Save Preferences** - Saves custom vendor selections
+5. **Open Checkout (share consent)** - Opens the configurable Checkout URL in a Custom Tab with `?axeptio_token=` appended, so the Axeptio web widget on that page stays hidden
 
 ### Visual Feedback
 - Success alerts for saved consent
 - API response details
 - Current consent status display
 - Loading indicators during API calls
+
+### Consent Sharing (WebView / Custom Tab)
+Demonstrates propagating native consent into a web page (checkout, account area, etc.) so the Axeptio web widget does not prompt again. The app reuses the same user token for both the headless consent submission and the web URL, appending `?axeptio_token=<token>` before opening the page in a Chrome Custom Tab / `SFSafariViewController` via `expo-web-browser`.
+
+Set the target page under **Settings → Checkout URL**. The mechanism, requirements, and caveats are documented in [WebView Consent Sharing](../../docs/platform-guides/webview-consent-sharing.md).
+
+> **Note:** Cross-context sharing only resolves on the **Production** environment — the public web widget reads the same consent store that Production headless writes to. Submit a `cookies` consent first; a fresh token with no consent behind it will still show the widget.
 
 ## Configuration
 
@@ -182,6 +190,8 @@ const VENDORS = {
 - [ ] API responses show in alerts
 - [ ] Check Status retrieves data
 - [ ] Loading states display correctly
+- [ ] Open Checkout appends `?axeptio_token=` and opens a Custom Tab
+- [ ] With consent submitted (Production), the web widget stays hidden; with a fresh token it appears
 
 ### API Response Monitoring
 The app displays full API responses in alerts for debugging:
@@ -208,6 +218,7 @@ This is a **demo implementation**. For production, consider:
 {
   "@react-native-async-storage/async-storage": "2.2.0",
   "expo": "^54.0.22",
+  "expo-web-browser": "~15.0.11",
   "react": "19.1.0",
   "react-native": "0.81.5",
   "react-native-modal": "^13.0.1"
