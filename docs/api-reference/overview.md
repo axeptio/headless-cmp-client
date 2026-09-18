@@ -44,8 +44,8 @@ Authorization: Bearer YOUR_API_TOKEN
 
 The only routes that do **not** require authentication are the documentation routes
 (`/mobile/docs`, `/mobile/swagger.json`), `GET /mobile/changelog`,
-[`GET /public/geolocation/{projectId}`](geolocation.md#public-unauthenticated-geolocation), and
-`GET /api/health`. `GET /mobile/health` **does** require a token, despite what the spec says.
+[`GET /public/geolocation/{projectId}`](geolocation.md#public-unauthenticated-geolocation) (and its
+`.js` variant), and `GET /api/health`. `GET /mobile/health` **does** require a token, despite what the spec says.
 
 See [Get your credentials](../getting-started/credentials.md) for how to obtain and validate your token.
 
@@ -549,7 +549,7 @@ To submit multiple consents, call the single-consent endpoint (`POST /mobile/con
 | `POST` | `/mobile/consents/{projectId}/{collection}/{configId}` | Submit a consent record |
 | `GET` | `/mobile/client/{projectId}/consents/{token}` | Retrieve consent (requires `service` and `identifier` query params) |
 | `GET` | `/mobile/geolocation/{projectId}` | Resolve country, regulation and the applicable configuration — see [Geolocation](geolocation.md) |
-| `GET` | `/public/geolocation/{projectId}` | Same resolution, unauthenticated — see [Geolocation](geolocation.md) |
+| `GET` | `/public/geolocation/{projectId}[.js]` | Same resolution, unauthenticated — see [Geolocation](geolocation.md) |
 | `GET` | `/mobile/terms/{projectId}/{configId}` | Terms & Conditions content — see [Terms & Conditions](terms.md) |
 | `GET` | `/mobile/terms/{projectId}/{configId}/pdf` | Terms & Conditions PDF — see [Terms & Conditions](terms.md) |
 | `POST` | `/mobile/analytics/evts` | Submit analytics events (requires `X-Mobile-Platform: headless` header) |
