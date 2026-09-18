@@ -6,7 +6,7 @@ Before you can call any endpoint, you need two things: an **API token** (for aut
 
 | Credential | What it is | Looks like |
 |------------|-----------|------------|
-| API token (Bearer token) | Authenticates every API request | A long string, passed in the `Authorization` header |
+| API token (Bearer token) | Authenticates your app to the API | A long string, passed in the `Authorization` header |
 | Project ID (`projectId`) | Identifies your Axeptio project | 24-character hexadecimal string (e.g. `507f1f77bcf86cd799439011`) |
 
 ## How to get them
@@ -59,14 +59,14 @@ Check for:
 
 If you get a `401`, double-check that your header uses the exact format `Authorization: Bearer YOUR_API_TOKEN` (with a space after "Bearer").
 
-> **Note**: The response field is `authorized`, not `valid`. Some older documentation may reference `valid`; that is incorrect.
+> **Note**: The response field is `authorized`, not `valid`. The published OpenAPI spec says `valid`; that is a spec bug, verified against the live API.
 
 ## Environments
 
 | Environment | Base URL | When to use |
 |-------------|----------|-------------|
-| Production | `https://headless-api.axeptio.tech/mobile` | Live apps, real consent data |
-| Staging | `https://staging-api.axeptio.tech/mobile` | Testing, development, experiments |
+| Production | `https://headless-api.axeptio.tech` | Live apps, real consent data |
+| Staging | `https://staging-api.axeptio.tech` | Testing, development, experiments |
 
 Both environments have Swagger UI for interactive testing:
 
@@ -77,13 +77,17 @@ Both environments have Swagger UI for interactive testing:
 
 ## How to use the token
 
-Every API request must include the token in the `Authorization` header:
+Requests to the authenticated endpoints must include the token in the `Authorization` header:
 
 ```
 Authorization: Bearer YOUR_API_TOKEN
 ```
 
-This applies to all endpoints: configuration, vendors, consent submission, consent retrieval, token generation, and analytics.
+This applies to configuration, vendors, geolocation, terms, consent submission, consent retrieval, token generation, and analytics.
+
+The public routes are the exception: `GET /public/geolocation/{projectId}` (and its `.js` variant),
+`GET /mobile/changelog`, the documentation routes (`/mobile/docs`, `/mobile/swagger.json`) and
+`GET /api/health` take no token.
 
 ## Store the token securely
 

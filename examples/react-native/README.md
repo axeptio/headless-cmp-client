@@ -15,7 +15,7 @@ This example demonstrates how to build a custom consent management interface in 
 ## Quick Start
 
 ### Prerequisites
-- Node.js 16+ and npm/yarn
+- Node.js 18+ and npm/yarn
 - Expo CLI: `npm install -g expo-cli`
 - iOS Simulator (Mac) or Android emulator
 
@@ -86,10 +86,11 @@ GET /mobile/client/{projectId}/consents/{token}?identifier={configId}&service=co
 ## Features
 
 ### Vendor Management
-The demo includes 3 mock vendors (since the project config is empty):
-- **Google Analytics** - Usage statistics and analytics
-- **Facebook Pixel** - Ad targeting and conversion tracking
-- **Mixpanel** - Product analytics and user behavior
+Vendors are fetched live from `GET /mobile/vendors/{projectId}` and rendered with their logo, title
+and description. Each toggle is keyed on the vendor's **`name` slug** from that response (e.g.
+`googletagmanager`) — that is the key the consent store matches on, not the 24-hex `id` and not the
+display title. If the vendor list cannot be loaded the modal says so rather than falling back to
+placeholder vendors, because placeholder keys would produce a consent nothing can read.
 
 ### User Actions
 1. **Manage Consent** - Opens the privacy settings modal
@@ -113,12 +114,25 @@ Set the target page under **Settings → Checkout URL**. The mechanism, requirem
 
 ## Configuration
 
-The app uses these hardcoded values (see `App.js`):
+Defaults live at the top of `App.js` and are all overridable at runtime under **Settings**
+(persisted in `AsyncStorage`):
 
 ```javascript
-const PROJECT_ID = '67fcdb2b52ab9a99a5865f4d';
-const API_BASE = 'https://staging-api.axeptio.tech/mobile';
+const DEFAULT_PROJECT_ID  = '67fcdb2b52ab9a99a5865f4d';
+const DEFAULT_ENVIRONMENT = 'staging';   // 'local-dev' | 'staging' | 'production'
+const DEFAULT_CHECKOUT_URL = '';         // page to open in a Custom Tab
+const APP_VERSION = '1.0.0';             // sent as headers['x-app-version']
+
+const ENVIRONMENTS = {
+  'local-dev':  { url: 'http://localhost:3000/mobile' },
+  staging:      { url: 'https://staging-api.axeptio.tech/mobile' },
+  production:   { url: 'https://headless-api.axeptio.tech/mobile' },
+};
 ```
+
+The demo authenticates with `Bearer project_<projectId>_test_token`, which the public demo project
+accepts. A real project needs a real bearer token — see
+[Credentials](../../docs/getting-started/credentials.md).
 
 ## API Endpoints Used
 
@@ -133,31 +147,47 @@ const API_BASE = 'https://staging-api.axeptio.tech/mobile';
 
 ### Consent Payload Structure
 
+This is exactly what the app sends:
+
 ```json
 {
   "accept": true,
   "token": "flfvv6d974b9jxwd",
+  "timestamp": "2025-06-01T12:05:00.000Z",
+  "headers": {
+    "x-mobile-platform": "react-native",
+    "x-app-version": "1.0.0"
+  },
   "preferences": {
     "config": {
       "language": "en",
-      "identifier": "your_config_id"
+      "identifier": "6859079473219bcbb8435079"
     },
     "vendors": {
-      "google_analytics": true,
-      "facebook_pixel": false,
-      "mixpanel": true
+      "googletagmanager": true,
+      "google_firebase_analytics": false
     },
     "googleConsentMode": {
       "version": 2,
-      "ad_storage": "denied",
-      "analytics_storage": "granted",
-      "ad_user_data": "denied",
-      "ad_personalization": "denied"
+      "security_storage": "granted",
+      "analytics_storage": "denied",
+      "ad_storage": "granted",
+      "ad_user_data": "granted",
+      "ad_personalization": "granted",
+      "functionality_storage": "granted",
+      "personalization_storage": "denied"
     }
   }
 }
 ```
-> Note: The example app currently places `googleConsentMode` at the top level, which is incorrect. This is tracked as a known issue in internal Axeptio ticket management: MSK-208. The payload shown here is the correct structure.
+
+Notes on the payload:
+- `accept` reflects whether any vendor was accepted, not which button was pressed.
+- `googleConsentMode` lives **inside** `preferences`; at the top level it is silently ignored.
+- All seven Google Consent Mode v2 signals are sent, derived from the accepted vendors' `type`
+  values (`buildGoogleConsentMode` in `App.js`). `security_storage` is always `granted`.
+
+See [Consent Model](../../docs/getting-started/consent-model.md) for the full schema.
 
 ## Customization
 
@@ -168,16 +198,9 @@ All styles are in the `StyleSheet` at the bottom of `App.js`. Key colors:
 - Background: `#f8f9fa` (light gray)
 
 ### Adding Vendors
-Add new vendors to the `VENDORS` object:
-
-```javascript
-const VENDORS = {
-  your_vendor_id: { 
-    name: 'Vendor Name', 
-    description: 'What this vendor does' 
-  }
-};
-```
+Vendors come from the project configuration, not from the app — add them in the Axeptio back-office
+and they appear in the modal on next launch. To point the demo at your own project, change the
+Project ID under **Settings**.
 
 ## Testing
 
@@ -203,7 +226,7 @@ The app displays full API responses in alerts for debugging:
 
 This is a **demo implementation**. For production, consider:
 
-1. **Authentication** - Add proper Bearer token authentication
+1. **Authentication** - Use a real Bearer token from a secure store (iOS Keychain / Android Keystore), not the demo `project_<id>_test_token` pattern
 2. **Storage** - Implement AsyncStorage for persistent consent
 3. **Offline Support** - Queue consent submissions when offline
 4. **Error Handling** - More robust error recovery
@@ -218,6 +241,7 @@ This is a **demo implementation**. For production, consider:
 {
   "@react-native-async-storage/async-storage": "2.2.0",
   "expo": "^54.0.22",
+  "expo-status-bar": "~3.0.8",
   "expo-web-browser": "~15.0.11",
   "react": "19.1.0",
   "react-native": "0.81.5",
