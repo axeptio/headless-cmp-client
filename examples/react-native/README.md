@@ -181,6 +181,17 @@ const VENDORS = {
 
 ## Testing
 
+### Unit tests
+
+```bash
+npm test    # node --test
+```
+
+Covers `appendAxeptioToken` in [`axeptioToken.js`](./axeptioToken.js) — the helper that propagates
+the consent token into the WebView URL: query preservation, idempotency, token replacement,
+fragment handling, percent-encoding, and the missing-argument cases. Uses Node's built-in test
+runner, so there are no extra dependencies.
+
 ### Manual Testing Checklist
 - [ ] Modal opens and closes properly
 - [ ] Vendor toggles work independently
