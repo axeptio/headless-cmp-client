@@ -8,6 +8,12 @@ This guide shows how to share the user's consent into that web context so the wi
 
 ## How it works
 
+> **`axeptio_token` is the *user consent token*** — the opaque, non-secret value from
+> `GET /mobile/token` that identifies one user's consent record. It is **never** your Bearer API
+> token. The Bearer token authenticates your application, is a credential, and must never appear in
+> a URL, a query string, a log, or anything a browser can see. See
+> [Identifiers](../getting-started/identifiers.md) for the difference between the two.
+
 The web widget accepts a consent identity through a single URL query parameter: **`axeptio_token`**. When the page loads with `?axeptio_token=<token>`, the widget:
 
 1. Reads the token from the URL.
@@ -20,6 +26,10 @@ The Headless CMP API writes consent to that **same store**, keyed by `projectId 
 - the web URL (`?axeptio_token=<same token>`).
 
 No cookies, JavaScript injection, or SDK is required on the web side — the widget resolves everything from the token.
+
+The consent token is not a secret, but it is a user identifier: treat it like a session ID. Do not
+log it verbatim, and prefer a masked form (`flfv…wd`) in anything that ends up in device logs or a
+screen recording.
 
 ---
 
@@ -79,6 +89,11 @@ function appendAxeptioToken(url, token) {
 
 // https://shop.example/checkout?step=1  ->  ...?step=1&axeptio_token=flfvv6d974b9jxwd
 ```
+
+The example app ships this helper as
+[`examples/react-native/axeptioToken.js`](../../examples/react-native/axeptioToken.js), covered by
+[`axeptioToken.test.js`](../../examples/react-native/axeptioToken.test.js) — run it with
+`npm test` from `examples/react-native` (Node's built-in runner, no extra dependencies).
 
 ---
 
