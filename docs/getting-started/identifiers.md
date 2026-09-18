@@ -112,9 +112,13 @@ Important characteristics:
 
 ## Bearer token (API token)
 
-The authentication token for all API requests. See [Credentials](./credentials.md) for how to obtain and validate it.
+The authentication token for the API's authenticated endpoints. See [Credentials](./credentials.md) for how to obtain and validate it.
 
-Quick distinction: the Bearer token authenticates *your app* to the API. The user token identifies *a specific user's* consent. Every request needs the Bearer token. Only consent-related requests need a user token.
+Quick distinction: the Bearer token authenticates *your app* to the API. The user token identifies *a specific user's* consent. Every request for your project's data needs the Bearer token; only consent-related requests also need a user token.
+
+The public routes are the exception: `GET /public/geolocation/{projectId}` (and its `.js` variant),
+`GET /mobile/changelog`, the documentation routes (`/mobile/docs`, `/mobile/swagger.json`) and
+`GET /api/health` take no token.
 
 ## Which endpoint needs which identifiers
 
@@ -126,7 +130,10 @@ Quick distinction: the Bearer token authenticates *your app* to the API. The use
 | `GET /mobile/token` | | | | Required |
 | `POST /mobile/consents/{projectId}/cookies/{configId}` | In path | In path | In body | Required |
 | `GET /mobile/client/{projectId}/consents/{token}` | In path | Query param (`identifier`) | In path | Required |
+| `GET /mobile/geolocation/{projectId}` | In path | | | Required |
+| `GET /mobile/terms/{projectId}/{configId}` | In path | In path | | Required |
 | `POST /mobile/analytics/evts` | | | | Required |
+| `GET /public/geolocation/{projectId}` | In path | | | **Not required** |
 
 > **Note on reading consent**: The `identifier` and `service` query parameters on `GET /mobile/client/{projectId}/consents/{token}` are both required. Without them, the endpoint will not return the expected consent data.
 

@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
   View,
   Text,
@@ -108,6 +108,14 @@ export default function App() {
   const [lastConsentToken, setLastConsentToken] = useState(null); // Store last used token
   const [currentUserToken, setCurrentUserToken] = useState(null); // Persistent user token (fetched from API)
   const [configId, setConfigId] = useState(null);
+  // Generation counter for vendor requests. loadSettings() resolves after mount,
+  // so the init effect fires twice on a cold start; Retry can add more. Without
+  // this, a slower earlier response can land last and leave the previous
+  // project's slugs selectable under the new project.
+  const vendorsRequestRef = useRef(0);
+  // Same guard for the configuration request: a stale defaultConfigId would be
+  // submitted under the new project.
+  const configRequestRef = useRef(0);
 
   // Settings state
   const [projectId, setProjectId] = useState(DEFAULT_PROJECT_ID);
@@ -170,13 +178,18 @@ export default function App() {
 
   // Fetch configuration, vendors, and token on mount or when settings change
   useEffect(() => {
+    let cancelled = false;
+
     const initializeApp = async () => {
       await fetchConfiguration();
+      if (cancelled) return;
       await fetchVendors();
+      if (cancelled) return;
 
       // Fetch initial token from API
       try {
         const token = await fetchToken();
+        if (cancelled) return;
         setCurrentUserToken(token);
         console.log('App initialized with token:', token);
       } catch (error) {
@@ -189,6 +202,10 @@ export default function App() {
     if (projectId && environment) {
       initializeApp();
     }
+
+    // A project or environment change supersedes this run: its remaining
+    // results must not be written over the new project's state.
+    return () => { cancelled = true; };
   }, [projectId, environment]);
 
   // Toggle individual vendor
@@ -334,6 +351,8 @@ export default function App() {
 
   // Fetch configuration to get configId
   const fetchConfiguration = async () => {
+    const requestId = ++configRequestRef.current;
+    const isCurrent = () => configRequestRef.current === requestId;
     try {
       const response = await fetch(
         `${apiBase}/configurations/${projectId}`,
@@ -348,6 +367,7 @@ export default function App() {
       if (response.ok) {
         const data = await response.json();
         if (data.defaultConfigId) {
+          if (!isCurrent()) return null;
           setConfigId(data.defaultConfigId);
           return data.defaultConfigId;
         }
@@ -360,6 +380,9 @@ export default function App() {
 
   // Fetch vendors from API
   const fetchVendors = async () => {
+    const requestId = ++vendorsRequestRef.current;
+    const isCurrent = () => vendorsRequestRef.current === requestId;
+
     setVendorsLoading(true);
     // Clear first: a project or environment change must never leave the previous
     // project's vendors selectable while the new list loads, or if it fails.
@@ -370,6 +393,7 @@ export default function App() {
     // Every failure funnels through here, so no path can leave the modal blank
     // but error-free — which would look loaded with nothing to consent to.
     const fail = (message) => {
+      if (!isCurrent()) return null;
       setApiVendors({});
       setVendors({});
       setVendorsError(message);
@@ -423,6 +447,7 @@ export default function App() {
         return fail('This project returned no usable vendors. Check the project configuration.');
       }
 
+      if (!isCurrent()) return null;
       setApiVendors(vendorMap);
       setVendors(vendorPreferences);
       setVendorsError(null);
@@ -432,7 +457,8 @@ export default function App() {
       console.error('Failed to fetch vendors:', error);
       return fail(`Could not load vendors: ${error.message}`);
     } finally {
-      setVendorsLoading(false);
+      // A superseded request must not clear the spinner for the live one.
+      if (isCurrent()) setVendorsLoading(false);
     }
   };
 
