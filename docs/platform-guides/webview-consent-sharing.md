@@ -77,8 +77,14 @@ const AXEPTIO_TOKEN_PARAM = 'axeptio_token';
 
 function appendAxeptioToken(url, token) {
   if (!url || !token) return url;
-  const [base, hash = ''] = url.split('#');
-  const [path, query = ''] = base.split('?');
+  // Split on the first delimiter only: a query value can itself be a URL
+  // carrying its own `?`, and a destructured split would drop the remainder.
+  const hashAt = url.indexOf('#');
+  const base = hashAt === -1 ? url : url.slice(0, hashAt);
+  const hash = hashAt === -1 ? '' : url.slice(hashAt + 1);
+  const queryAt = base.indexOf('?');
+  const path = queryAt === -1 ? base : base.slice(0, queryAt);
+  const query = queryAt === -1 ? '' : base.slice(queryAt + 1);
   const params = query
     .split('&')
     .filter(part => part && part.split('=')[0] !== AXEPTIO_TOKEN_PARAM);
@@ -88,6 +94,7 @@ function appendAxeptioToken(url, token) {
 }
 
 // https://shop.example/checkout?step=1  ->  ...?step=1&axeptio_token=flfvv6d974b9jxwd
+// https://shop.example/c?returnTo=https://x/y?step=1  ->  ...?step=1&axeptio_token=...
 ```
 
 The example app ships this helper as

@@ -11,8 +11,15 @@ const AXEPTIO_TOKEN_PARAM = 'axeptio_token';
 // Returns the original url unchanged if url or token is missing.
 const appendAxeptioToken = (url, token) => {
   if (!url || !token) return url;
-  const [base, hash = ''] = url.split('#');
-  const [path, query = ''] = base.split('?');
+  // Split on the FIRST delimiter only. A destructured `split('#')`/`split('?')`
+  // silently drops everything after a second one, which a URL legitimately has
+  // when a query value is itself a URL (?returnTo=https://x/y?step=1).
+  const hashAt = url.indexOf('#');
+  const base = hashAt === -1 ? url : url.slice(0, hashAt);
+  const hash = hashAt === -1 ? '' : url.slice(hashAt + 1);
+  const queryAt = base.indexOf('?');
+  const path = queryAt === -1 ? base : base.slice(0, queryAt);
+  const query = queryAt === -1 ? '' : base.slice(queryAt + 1);
   const params = query
     .split('&')
     .filter(part => part && part.split('=')[0] !== AXEPTIO_TOKEN_PARAM);

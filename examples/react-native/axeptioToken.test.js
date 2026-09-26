@@ -44,6 +44,20 @@ test('percent-encodes tokens containing URL-unsafe characters', () => {
   );
 });
 
+test('preserves a query value that is itself a URL with its own query string', () => {
+  assert.equal(
+    appendAxeptioToken('https://shop.example/c?returnTo=https://other.example/a?step=1', TOKEN),
+    `https://shop.example/c?returnTo=https://other.example/a?step=1&axeptio_token=${TOKEN}`
+  );
+});
+
+test('keeps a fragment that itself contains a #', () => {
+  assert.equal(
+    appendAxeptioToken('https://shop.example/c?step=1#a#b', TOKEN),
+    `https://shop.example/c?step=1&axeptio_token=${TOKEN}#a#b`
+  );
+});
+
 test('returns the URL unchanged when the token is missing', () => {
   assert.equal(appendAxeptioToken('https://shop.example/c', ''), 'https://shop.example/c');
   assert.equal(appendAxeptioToken('https://shop.example/c', null), 'https://shop.example/c');
