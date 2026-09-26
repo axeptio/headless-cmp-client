@@ -181,6 +181,18 @@ export default function App() {
 
     // Only initialize if we have settings loaded
     if (projectId && environment) {
+      // Invalidate synchronously, before the first await. Otherwise the previous
+      // project's vendors stay populated (and canSubmitConsent stays true) for
+      // the whole fetchConfiguration() round trip, so a quick Save could submit
+      // the old project's slugs under the new project. Bumping the generation
+      // also supersedes any vendor request still in flight from the last run.
+      vendorsRequestRef.current += 1;
+      setApiVendors({});
+      setVendors({});
+      setVendorsError(null);
+      setVendorsLoading(true);
+      setConfigId(null);
+
       initializeApp();
     }
 
