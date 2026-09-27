@@ -191,7 +191,10 @@ export default function App() {
       setVendors({});
       setVendorsError(null);
       setVendorsLoading(true);
-      setConfigId(null);
+      // The token too: on a cold start the default project's init can finish
+      // before loadSettings() applies the saved project, and the new project
+      // would otherwise inherit the previous project's consent identity.
+      resetConsentState();
 
       initializeApp();
     }
@@ -200,6 +203,17 @@ export default function App() {
     // results must not be written over the new project's state.
     return () => { cancelled = true; };
   }, [projectId, environment]);
+
+  // Everything tied to one project's consent identity. Both reset paths — a
+  // project/environment change and an explicit Settings save — go through here,
+  // so neither can be updated without the other.
+  const resetConsentState = () => {
+    setConfigId(null);
+    setCurrentUserToken(null);
+    setLastConsentToken(null);
+    setLastConsentId(null);
+    setConsentStatus('Not Set');
+  };
 
   // Toggle individual vendor
   const toggleVendor = (vendorKey) => {
@@ -700,11 +714,7 @@ export default function App() {
       setSettingsModalVisible(false);
 
       // Reset app state when settings change
-      setConfigId(null);
-      setCurrentUserToken(null);
-      setLastConsentToken(null);
-      setLastConsentId(null);
-      setConsentStatus('Not Set');
+      resetConsentState();
 
       Alert.alert('Settings Saved', 'App will reinitialize with new settings');
     } catch (error) {
