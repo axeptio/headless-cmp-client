@@ -15,7 +15,7 @@ This example demonstrates how to build a custom consent management interface in 
 ## Quick Start
 
 ### Prerequisites
-- Node.js 16+ and npm/yarn
+- Node.js 18+ and npm/yarn (`npm test` uses the built-in `node:test` runner)
 - Expo CLI: `npm install -g expo-cli`
 - iOS Simulator (Mac) or Android emulator
 
