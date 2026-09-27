@@ -15,7 +15,7 @@ This example demonstrates how to build a custom consent management interface in 
 ## Quick Start
 
 ### Prerequisites
-- Node.js 16+ and npm/yarn
+- Node.js 18+ and npm/yarn (`npm test` uses the built-in `node:test` runner)
 - Expo CLI: `npm install -g expo-cli`
 - iOS Simulator (Mac) or Android emulator
 
@@ -180,6 +180,17 @@ const VENDORS = {
 ```
 
 ## Testing
+
+### Unit tests
+
+```bash
+npm test    # node --test
+```
+
+Covers `appendAxeptioToken` in [`axeptioToken.js`](./axeptioToken.js) — the helper that propagates
+the consent token into the WebView URL: query preservation, idempotency, token replacement,
+fragment handling, percent-encoding, and the missing-argument cases. Uses Node's built-in test
+runner, so there are no extra dependencies.
 
 ### Manual Testing Checklist
 - [ ] Modal opens and closes properly
