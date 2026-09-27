@@ -45,7 +45,7 @@ The app uses these dependencies:
 
 The entire implementation lives in `App.js`. There is no separate SDK, no installable package, and no pre-built components. The app is a reference implementation: read it, understand the API calls, then build your own UI.
 
-> **Known bugs in the example app**: The app has two confirmed issues tracked in Linear. First, `googleConsentMode` is placed at the top level of the consent payload instead of inside `preferences`, which means Google Consent Mode signals are silently dropped by the API (MSK-208, medium). Second, only 4 of the 7 GCM v2 signals are sent; `functionality_storage`, `personalization_storage`, and `security_storage` are missing (MSK-209, low, blocked by MSK-208). Additionally, `accept` is hardcoded to `true` even for rejection flows.
+> The example app is kept in sync with this guide: it keys `preferences.vendors` on the vendor `name` slug, derives `accept` from the user's choices, and sends all seven Google Consent Mode v2 signals inside `preferences`.
 
 ---
 
@@ -89,6 +89,11 @@ const vendorData = await response.json();
 // vendorData.vendors is an array; the app maps it to toggle switches
 ```
 
+Each toggle is keyed on the vendor's **`name`** field (e.g. `googletagmanager`) — the slug the
+consent store matches on. Do **not** key on `id` (the 24-hex ObjectId) or on the display `title`:
+the API will accept and store those keys, but nothing else on the platform will recognise the
+user's choices. Use `title`, `description` and `image` for display only.
+
 ### Generate a user token
 
 The app calls `fetchToken()` to get a 16-character token from the API:
@@ -115,14 +120,20 @@ The `submitConsent()` function builds the payload and posts it:
 
 ```javascript
 const consent = {
-  accept: true,
+  accept: acceptedKeys.length > 0,
   token: tokenToUse,
+  timestamp: new Date().toISOString(),
+  headers: {
+    'x-mobile-platform': 'react-native',
+    'x-app-version': APP_VERSION
+  },
   preferences: {
     config: {
       language: 'en',
       identifier: currentConfigId
     },
-    vendors: vendorPreferences
+    vendors: vendorPreferences,   // { "googletagmanager": true, ... }
+    googleConsentMode: buildGoogleConsentMode(apiVendors, acceptedKeys)
   }
 };
 
@@ -196,14 +207,14 @@ Store the user token (from `GET /mobile/token`) the same way. The user token doe
 
 ### Handle the `accept` field correctly
 
-The example app hardcodes `accept: true` for all submissions, even when the user rejects all vendors. In your implementation, set `accept` based on the user's actual choice:
+Set `accept` from the user's actual choice, not from the button they pressed:
 
 ```javascript
 const consent = {
   accept: hasUserAcceptedAnyVendor,  // true if at least one vendor is accepted
   token: userToken,
   preferences: {
-    vendors: vendorPreferences  // { "vendor_key": true/false, ... }
+    vendors: vendorPreferences  // { "googletagmanager": true, ... }
   }
 };
 ```
@@ -219,7 +230,7 @@ const consent = {
   accept: true,
   token: userToken,
   preferences: {
-    vendors: { google_analytics: true, facebook_pixel: false },
+    vendors: { googletagmanager: true, google_firebase_analytics: false },
     googleConsentMode: {
       version: 2,
       ad_storage: 'denied',

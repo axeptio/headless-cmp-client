@@ -19,23 +19,35 @@ Widget API spec: https://staging-api.axeptio.tech/mobile/swagger/widget.json
 
 ## Endpoint Catalog
 
-All endpoints require `Authorization: Bearer YOUR_API_TOKEN`.
-Base URL: `https://headless-api.axeptio.tech`
+Every endpoint in the table below requires `Authorization: Bearer YOUR_API_TOKEN`, except
+`/public/geolocation/{projectId}` and its `.js` settings-snippet variant. The documentation routes
+(`/mobile/docs`, `/mobile/swagger.json`), `/mobile/changelog` and `/api/health` are also
+unauthenticated.
+
+Base URL: `https://headless-api.axeptio.tech`. Paths are shown in full, including their
+`/mobile` or `/public` prefix.
 
 | Method | Path | Description |
 |--------|------|-------------|
-| `POST` | `/mobile/consents/{clientId}/{collection}/{configId}` | Submit a consent record |
+| `POST` | `/mobile/consents/{projectId}/{collection}/{configId}` | Submit a consent record |
 | `GET` | `/mobile/client/{projectId}/consents/{token}` | Retrieve consent status for a user token |
 | `GET` | `/mobile/configurations/{projectId}` | Mobile-optimized project configuration |
 | `GET` | `/mobile/token` | Generate a secure consent token |
 | `GET` | `/mobile/auth/me` | Validate bearer token + get project/tier info |
 | `GET` | `/mobile/vendors/{projectId}` | All vendors for a project |
-| `GET` | `/mobile/vendors/{projectId}/categories` | Vendors grouped by category |
+| `GET` | `/mobile/vendors/{projectId}/categories` | Purpose-step categories of the default configuration |
 | `GET` | `/mobile/vendors/{projectId}/{configId}` | Config-specific vendor list |
+| `GET` | `/mobile/vendors/{projectId}/{configId}/categories` | Purpose-step categories for a configuration |
+| `GET` | `/mobile/geolocation/{projectId}` | Resolve country, regulation and applicable config |
+| `GET` | `/public/geolocation/{projectId}` | Same, unauthenticated (`.js` variant returns a GTM settings snippet) |
+| `GET` | `/mobile/terms/{projectId}/{configId}` | Terms & Conditions content (`/pdf` for the PDF) |
 | `POST` | `/mobile/analytics/evts` | Submit analytics events (single or batch) |
-| `GET` | `/mobile/health` | Service health + circuit breaker status |
+| `GET` | `/mobile/health` | Service health (Bearer required; use `GET /api/health` unauthenticated) |
 
-Collections for consent submission: `cookies` · `processings` · `contracts` · `contractsV2`
+Collections for consent submission: `cookies` · `processings` · `terms` (alias of `contractsV2`)
+
+An IAB TCF suite (`/mobile/tcf/*`), project statistics (`GET /stats`) and an API changelog
+(`GET /mobile/changelog`) are also live; see the Swagger UI above until they are documented here.
 
 ---
 
@@ -75,6 +87,7 @@ await fetch(`${BASE_URL}/mobile/consents/${PROJECT_ID}/cookies/${defaultConfigId
   body: JSON.stringify({
     accept: true,
     token,
+    // keys are vendor `name` slugs from GET /mobile/vendors/{projectId}
     preferences: { vendors: { google_analytics: true, facebook_pixel: false } },
   }),
 });
@@ -95,6 +108,8 @@ const consent = await fetch(
 | [Quick Start](./docs/getting-started/quick-start.md) | 5-minute setup guide |
 | [Authentication](./docs/getting-started/authentication.md) | Bearer tokens, secure storage, error handling |
 | [API Reference](./docs/api-reference/overview.md) | Full endpoint catalog, rate limits, error codes |
+| [Geolocation](./docs/api-reference/geolocation.md) | Resolve country, regulation and the applicable configuration |
+| [Terms & Conditions](./docs/api-reference/terms.md) | Fetch published terms content or PDF, and record acceptance |
 | [React Native Guide](./docs/platform-guides/react-native.md) | `useConsent` hook, offline queue, Google Consent Mode |
 | [Mobile Integration Reference](./docs/platform-guides/mobile-integration-reference.md) | Comprehensive multi-platform reference (iOS, Android, RN) |
 | [WebView Consent Sharing](./docs/platform-guides/webview-consent-sharing.md) | Share consent into a Custom Tab / WebView via `?axeptio_token=` so the web widget stays hidden |

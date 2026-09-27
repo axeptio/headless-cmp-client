@@ -14,8 +14,8 @@ When you submit consent via `POST /mobile/consents/{projectId}/cookies/{configId
   "token": "flfvv6d974b9jxwd",
   "preferences": {
     "vendors": {
-      "vendor_key_1": true,
-      "vendor_key_2": false
+      "googletagmanager": true,
+      "google_firebase_analytics": false
     }
   }
 }
@@ -27,15 +27,22 @@ When you submit consent via `POST /mobile/consents/{projectId}/cookies/{configId
 |-------|------|-------------|
 | `accept` | boolean | `true` if the user accepts all or some vendors; `false` if they reject all vendors; can also represent a partial acceptance depending on your UI flow |
 | `token` | string | The user token from `GET /mobile/token` (16-char lowercase alphanumeric) |
-| `preferences.vendors` | object | Keys are vendor IDs from your vendor list; values are `true` (accepted) or `false` (rejected). Must have at least one vendor key. |
+| `preferences.vendors` | object | Keys are vendor **`name` slugs** from your vendor list; values are `true` (accepted) or `false` (rejected). Must have at least one vendor key. |
 
 ### Optional fields
 
 | Field | Type | Description |
 |-------|------|-------------|
-| `preferences.config` | object | Configuration details; can include `language`, `identifier` (configId), and other metadata |
+| `preferences.config` | object | Configuration details; see [`preferences.config`](#preferencesconfig-optional) below |
 | `preferences.googleConsentMode` | object | Google Consent Mode v2 signals (see [Google Consent Mode](#google-consent-mode-v2) section below) |
 | `value` | string or null | Optional pass-through field; max 255 characters. Returned as-is in the consent record. Useful for storing custom metadata. |
+| `timestamp` | string | ISO 8601 time the user made the choice. Defaults to the time the API received the request |
+| `headers` | object | Client metadata; see [`headers`](#headers-optional) below |
+
+### Size limits
+
+The request body must be **100 KB or smaller** — a larger body is rejected with `413`. The `token`
+field must be 255 characters or fewer.
 
 ### Field details
 
@@ -48,7 +55,9 @@ When you submit consent via `POST /mobile/consents/{projectId}/cookies/{configId
 #### `preferences.vendors`
 
 An object where:
-- **Key**: Vendor identifier (string). Must match a vendor ID from your vendor list (from `GET /mobile/vendors/{projectId}`), or can be an arbitrary string (the API does not validate against the configured vendor list)
+- **Key**: the vendor's **`name`** field from `GET /mobile/vendors/{projectId}` — a slug such as
+  `googletagmanager` or `google_firebase_analytics`. **Not** the vendor's `id` (the 24-char hex
+  ObjectId), and not a display title.
 - **Value**: `true` (accepted) or `false` (rejected)
 
 Example:
@@ -56,30 +65,79 @@ Example:
 ```json
 "preferences": {
   "vendors": {
-    "google_analytics": true,
-    "facebook_pixel": false,
-    "custom_vendor": true
+    "googletagmanager": true,
+    "google_firebase_analytics": false
   }
 }
 ```
+
+> **This is the single easiest thing to get wrong.** The API does not validate vendor keys — it
+> stores whatever you send and returns `200`. But the rest of the platform, including the web
+> widget that reads a shared consent, matches on the `name` slug. Send an `id`, a display title, or
+> an invented key and the consent is recorded but effectively invisible: the widget will not
+> recognise the user's choices and will prompt them again. See
+> [WebView consent sharing](../platform-guides/webview-consent-sharing.md).
 
 > **Important**: This object must not be empty. Every consent submission must include at least one vendor key.
 
 #### `preferences.config` (optional)
 
-Additional configuration metadata. Typically includes:
+Additional configuration metadata:
 
 ```json
 "preferences": {
   "config": {
+    "name": "mchffr-app",
+    "identifier": "6859079473219bcbb8435079",
     "language": "en",
-    "identifier": "my-config-en"
+    "consentMode": "opt-in",
+    "displayMode": "banner",
+    "tag": "v2",
+    "mobileContext": {
+      "platform": "react-native",
+      "offline": false,
+      "networkType": "wifi"
+    }
   },
   "vendors": { ... }
 }
 ```
 
+| Field | Description |
+|-------|-------------|
+| `name` | The configuration's back-office name |
+| `identifier` | The `configId` (24-char hex ObjectId) |
+| `language` | Language the consent UI was shown in |
+| `consentMode` | How consent was collected, e.g. `opt-in` |
+| `displayMode` | How the UI was presented, e.g. `banner` |
+| `tag` | Free-form version tag for your own UI |
+| `mobileContext` | `platform`, `offline` (boolean), `syncBatch` (for queued offline submissions), `networkType` (`wifi` \| `cellular` \| `unknown`) |
+
 If omitted, the API uses the configuration from the endpoint path (`{configId}`).
+
+#### `headers` (optional)
+
+Client metadata stored alongside the consent. Top-level, **not** inside `preferences`:
+
+```json
+{
+  "accept": true,
+  "token": "flfvv6d974b9jxwd",
+  "headers": {
+    "user-agent": "MyApp/2.1.0 (iOS 17.0; iPhone)",
+    "x-mobile-platform": "react-native",
+    "x-mobile-version": "17.0",
+    "x-app-version": "2.1.0",
+    "x-device-id": "uuid-device-123",
+    "x-session-id": "session-789"
+  },
+  "preferences": { ... }
+}
+```
+
+`x-mobile-platform` accepts `ios`, `android`, `react-native`, `flutter`, `xamarin`, or `cordova`.
+The API also records its own `headers` block on the response (IP, country, user agent); the two are
+merged, not overwritten.
 
 #### `preferences.googleConsentMode` (optional)
 
@@ -107,8 +165,6 @@ Google Consent Mode v2 signals. See [Google Consent Mode v2](#google-consent-mod
 }
 ```
 
-This is tracked as a known issue (MSK-208) in the internal Axeptio ticket management system for the Example App.
-
 #### `value` (optional)
 
 A pass-through string field (max 255 characters) or `null`. The API stores and returns it as-is in the consent record. Useful for:
@@ -131,12 +187,12 @@ Example:
 
 ## Consent response (what the API returns)
 
-When you submit consent or retrieve it later, the API returns:
+When you **submit** consent, the API returns:
 
 ```json
 {
-  "consentId": "507f1f77bcf86cd799439012",
-  "_id": "507f1f77bcf86cd799439012",
+  "consentId": "01a0b37b-3621-7913-bd50-7a37b56816e7",
+  "_id": "01a0b37b-3621-7913-bd50-7a37b56816e7",
   "projectId": "507f1f77bcf86cd799439011",
   "createdAt": "2025-06-01T12:05:00.000Z",
   "headers": {
@@ -146,13 +202,13 @@ When you submit consent or retrieve it later, the API returns:
   },
   "accept": true,
   "collection": "cookies",
-  "identifier": "my-config-en",
+  "identifier": "6859079473219bcbb8435079",
   "token": "flfvv6d974b9jxwd",
   "value": null,
   "preferences": {
     "vendors": {
-      "google_analytics": true,
-      "facebook_pixel": false
+      "googletagmanager": true,
+      "google_firebase_analytics": false
     },
     "googleConsentMode": {
       "version": 2,
@@ -172,16 +228,41 @@ When you submit consent or retrieve it later, the API returns:
 
 | Field | Description |
 |-------|-------------|
-| `consentId`, `_id` | Same value; the unique ID for this consent record |
+| `consentId`, `_id` | Same value; the unique ID for this consent record (a UUID). Only `_id` is present when reading a consent back |
 | `projectId` | Your project ID |
 | `createdAt` | ISO 8601 timestamp when the consent was recorded |
 | `headers` | Metadata from the HTTP request: IP address, country, user agent |
 | `accept` | The `accept` value you submitted |
-| `collection` | The collection type: `cookies`, `processings`, `contracts`, or `contractsV2` |
+| `collection` | The collection type: `cookies`, `processings`, `terms` / `contractsV2` |
 | `identifier` | The configuration identifier (`configId`) used |
 | `token` | The user token (echoes what you sent) |
 | `value` | The `value` field you submitted (or `null` if not provided) |
 | `preferences` | The full preferences object you submitted, including vendors and googleConsentMode |
+
+### Reading a consent back
+
+`GET /mobile/client/{projectId}/consents/{token}` returns the same record with two differences:
+
+- there is **no `consentId`** — use `_id`;
+- the stored `timestamp` is included alongside `createdAt`.
+
+```json
+{
+  "_id": "01a0b37b-3621-7913-bd50-7a37b56816e7",
+  "projectId": "507f1f77bcf86cd799439011",
+  "token": "flfvv6d974b9jxwd",
+  "collection": "cookies",
+  "identifier": "6859079473219bcbb8435079",
+  "accept": true,
+  "timestamp": "2025-06-01T12:05:00.000Z",
+  "createdAt": "2025-06-01T12:05:00.000Z",
+  "headers": { "ip": "203.0.113.45", "country": "GB", "userAgent": "..." },
+  "value": null,
+  "preferences": { "vendors": { "googletagmanager": true } }
+}
+```
+
+`preferences` may also carry `mobileOptimized` (`compactVendors`, `essentialOnly`), and TCF consents include a top-level `decoded` object with the parsed TC string.
 
 ---
 
@@ -193,8 +274,9 @@ The `POST /mobile/consents/{projectId}/{collection}/{configId}` endpoint support
 |------------|---------|-------------|
 | `cookies` | Cookie consent (most common) | Default consent type for website/app cookie preferences |
 | `processings` | GDPR legal basis / data processing consent | When you need to track legal basis for data processing (contract, legitimate interest, etc.) |
-| `contracts` | Legacy contract consent | Deprecated; use `contractsV2` instead |
-| `contractsV2` | Modern contract consent with support for `consentFor` field | For service-specific consent tracking |
+| `terms` | Terms & Conditions acceptance | The public name for `contractsV2`. Use this in new integrations — see [Terms & Conditions](../api-reference/terms.md) |
+| `contractsV2` | Same collection as `terms` | The internal name; both paths route to the same place |
+| `contracts` | Legacy contract consent | Deprecated; use `terms` instead |
 
 In the integration lifecycle, we use `cookies` in the examples:
 
@@ -206,8 +288,22 @@ To submit to a different collection, change the path:
 
 ```
 POST /mobile/consents/{projectId}/processings/{configId}
-POST /mobile/consents/{projectId}/contractsV2/{configId}
+POST /mobile/consents/{projectId}/terms/{configId}
 ```
+
+The same names are used when reading a consent back, as the `?service=` query parameter:
+
+```
+GET /mobile/client/{projectId}/consents/{token}?service=terms&identifier={configId}
+```
+
+### IAB TCF consents
+
+Projects whose configuration has `flowType: "tcf"` submit an IAB TCF consent instead: the same
+endpoint, with `preferences.tcString`, `preferences.cmpVersion`, `preferences.gdprApplies` and
+`preferences.version` in the body. Those submissions are validated against a dedicated schema and
+return JSON error bodies rather than plain text. The TCF flow is not covered in this guide yet —
+see the [Swagger UI](https://headless-api.axeptio.tech/mobile/docs) for the full contract.
 
 ---
 
@@ -276,11 +372,6 @@ If your consent UI has buttons like "Accept All" and "Reject All":
 }
 ```
 
-### Known issues
-
-1) The example app places `googleConsentMode` at the top level of the payload instead of inside `preferences`. At the top level, it is silently ignored by the API. Always put it inside `preferences`.
-2) The example app only sends 4 of the 7 Google Consent Mode signals. It is missing `functionality_storage`, `personalization_storage`, and `security_storage`. Make sure your implementation sends all 7.
-
 ---
 
 ## Minimal vs. complete payload
@@ -315,7 +406,7 @@ A comprehensive consent submission with all optional fields:
   "preferences": {
     "config": {
       "language": "en",
-      "identifier": "my-config-en"
+      "identifier": "6859079473219bcbb8435079"
     },
     "vendors": {
       "google_analytics": true,

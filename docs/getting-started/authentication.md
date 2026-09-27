@@ -13,19 +13,19 @@ The API uses two different tokens. Think of it like a building pass and a visito
 | Bearer token (API token) | Authenticates your app | `Authorization: Bearer {token}` header | Support request (see [Credentials](./credentials.md)) |
 | User token (consent token) | Identifies a user's consent record | Request body and URL path | `GET /mobile/token` endpoint |
 
-Every API request needs the Bearer token. Only consent-related requests need a user token.
+Every API request that returns your project's data needs the Bearer token. Only consent-related requests need a user token. The public routes are the exception: `GET /public/geolocation/{projectId}` (and its `.js` variant), `GET /mobile/changelog`, the documentation routes (`/mobile/docs`, `/mobile/swagger.json`) and `GET /api/health` take no token.
 
 See [Identifiers](./identifiers.md) for the full breakdown of which endpoint needs which token.
 
 ## How authentication works
 
-Every request must include the Bearer token in the `Authorization` header:
+Requests to the authenticated endpoints must include the Bearer token in the `Authorization` header:
 
 ```
 Authorization: Bearer YOUR_API_TOKEN
 ```
 
-The API validates the token on every request. If the token is missing, malformed, or expired, the API returns `401 Unauthorized`.
+The API validates the token on every authenticated request. If the token is missing, malformed, or expired, the API returns `401 Unauthorized`.
 
 ### Validate your token
 
@@ -49,7 +49,7 @@ Successful response:
 
 Check that `authorized` is `true` and that `projectId` matches your project. If you get a `401`, double-check the `Bearer ` prefix (note the space after "Bearer").
 
-> **Note**: The response field is `authorized`, not `valid`. Some older documentation references `valid`; that is incorrect.
+> **Note**: The response field is `authorized`, not `valid`. The published OpenAPI spec says `valid`; that is a spec bug, verified against the live API.
 
 ## Bearer token expiry
 
@@ -88,6 +88,8 @@ For a React Native implementation, the `react-native-keychain` package provides 
 | `401` | Unauthorized | Token is missing, malformed, or expired. Verify format, request a new token if needed |
 | `403` | Forbidden | Token is valid but lacks permission for this endpoint |
 | `404` | Not found | Check the endpoint path and identifiers (projectId, configId, token) |
+| `405` | Method not allowed | Check the verb — several endpoints are `GET`-only, and analytics is `POST`-only |
+| `413` | Payload too large | Keep request bodies at or under 100 KB |
 | `429` | Rate limited | Wait and retry. Check the `Retry-After` header for the delay |
 | `500` | Server error | Retry with backoff; report if persistent |
 
@@ -102,7 +104,7 @@ When your integration receives a `401`:
 
 When your integration receives a `429`:
 
-1. Read the `Retry-After` response header
+1. Read the `Retry-After` response header (and `X-RateLimit-Reset` for the window)
 2. Wait for the specified duration
 3. Retry the request
 4. If you hit rate limits frequently, reduce your request frequency or batch your operations
@@ -113,13 +115,13 @@ For production apps, implement retry logic with exponential backoff for network 
 
 ## Security best practices
 
-1. **Always use HTTPS.** The API base URLs (`https://headless-api.axeptio.tech/mobile` and `https://staging-api.axeptio.tech/mobile`) are HTTPS only.
+1. **Always use HTTPS.** The API base URLs (`https://headless-api.axeptio.tech` and `https://staging-api.axeptio.tech`) are HTTPS only.
 
 2. **Consider certificate pinning** for production mobile apps to prevent man-in-the-middle attacks.
 
 3. **Set request timeouts.** 30 seconds is a reasonable default for mobile networks.
 
-4. **Separate staging and production tokens.** Use the staging environment (`https://staging-api.axeptio.tech/mobile`) during development; switch to production for release builds.
+4. **Separate staging and production tokens.** Use the staging environment (`https://staging-api.axeptio.tech`) during development; switch to production for release builds.
 
 ---
 

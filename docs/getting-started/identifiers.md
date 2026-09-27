@@ -7,7 +7,7 @@ The headless API uses several identifiers across its endpoints. This page explai
 | Identifier | What it is | Format | Where it comes from |
 |------------|-----------|--------|-------------------|
 | `projectId` | Your project's unique ID | 24-char hex (e.g. `507f1f77bcf86cd799439011`) | Available when you create a new project in the admin panel (no subscription required) |
-| `configId` | A configuration within your project | String identifier (e.g. `my-config-en`) | From `defaultConfigId` in the `GET /mobile/configurations/{projectId}` response |
+| `configId` | A configuration within your project | 24-character hex string (e.g. `6859079473219bcbb8435079`) | From `defaultConfigId` in the `GET /mobile/configurations/{projectId}` response |
 | User token | Identifies a user's consent record | 16-char lowercase alphanumeric (e.g. `flfvv6d974b9jxwd`) | Generated via `GET /mobile/token` |
 | Bearer token (API token) | Authenticates your API requests | Long string, passed in the `Authorization` header | Requested from support (see [Credentials](./credentials.md)) |
 
@@ -57,15 +57,16 @@ Response:
   "projectId": "507f1f77bcf86cd799439011",
   "configurations": [
     {
-      "identifier": "my-config-en",
-      "name": "English Configuration",
+      "identifier": "6859079473219bcbb8435079",
+      "name": "en-gb-config",
+      "flowType": "brands",
       "title": "Cookie Preferences",
       "language": "en",
       "country": "GB",
       "isDefault": true
     }
   ],
-  "defaultConfigId": "my-config-en"
+  "defaultConfigId": "6859079473219bcbb8435079"
 }
 ```
 
@@ -111,9 +112,13 @@ Important characteristics:
 
 ## Bearer token (API token)
 
-The authentication token for all API requests. See [Credentials](./credentials.md) for how to obtain and validate it.
+The authentication token for the API's authenticated endpoints. See [Credentials](./credentials.md) for how to obtain and validate it.
 
-Quick distinction: the Bearer token authenticates *your app* to the API. The user token identifies *a specific user's* consent. Every request needs the Bearer token. Only consent-related requests need a user token.
+Quick distinction: the Bearer token authenticates *your app* to the API. The user token identifies *a specific user's* consent. Every request for your project's data needs the Bearer token; only consent-related requests also need a user token.
+
+The public routes are the exception: `GET /public/geolocation/{projectId}` (and its `.js` variant),
+`GET /mobile/changelog`, the documentation routes (`/mobile/docs`, `/mobile/swagger.json`) and
+`GET /api/health` take no token.
 
 ## Which endpoint needs which identifiers
 
@@ -125,7 +130,10 @@ Quick distinction: the Bearer token authenticates *your app* to the API. The use
 | `GET /mobile/token` | | | | Required |
 | `POST /mobile/consents/{projectId}/cookies/{configId}` | In path | In path | In body | Required |
 | `GET /mobile/client/{projectId}/consents/{token}` | In path | Query param (`identifier`) | In path | Required |
+| `GET /mobile/geolocation/{projectId}` | In path | | | Required |
+| `GET /mobile/terms/{projectId}/{configId}` | In path | In path | | Required |
 | `POST /mobile/analytics/evts` | | | | Required |
+| `GET /public/geolocation/{projectId}` | In path | | | **Not required** |
 
 > **Note on reading consent**: The `identifier` and `service` query parameters on `GET /mobile/client/{projectId}/consents/{token}` are both required. Without them, the endpoint will not return the expected consent data.
 
