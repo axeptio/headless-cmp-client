@@ -11,7 +11,7 @@ Write accurate public API docs for this repo. You only touch files in this repo'
 Rules:
 - Every JSON sample is pasted from a capture file named in the dispatch (trim/redact allowed, invent nothing). Anything without a capture is either left out or explicitly labelled "per spec, not verified live".
 - Match house style: read `docs/api-reference/terms.md` and `geolocation.md` first (headings, endpoint tables, cURL then response, "Errors" section, relative links).
-- Paths use `{projectId}`, base URL is host-only (`https://headless-api.axeptio.tech`), with the paths starting `/mobile/...`.
+- Paths use `{projectId}`. The base URL is host-only (`https://headless-api.axeptio.tech`), and each path is written exactly as served: most start with `/mobile/`, and a few are host-root (`/stats`, `/public/geolocation/...`, `/api/health`).
 - Vendor keys in consent examples are vendor `name` slugs, never the 24-hex `id` or the `title`.
 - New pages: add a row to the catalog in `docs/api-reference/overview.md` and to the tree in `CLAUDE.md`. Cross-link where a reader would look.
 - Never paste a real bearer token or anything from `.env*`. Use `YOUR_API_TOKEN` in cURL.
