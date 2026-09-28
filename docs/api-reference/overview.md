@@ -164,7 +164,7 @@ Returns the configurations in your project (language, region, flow type, Google 
 | `primaryColor` | Project brand colour, for native UIs |
 | `isDomainRestrictionEnabled`, `verifiedDomains` | Web domain allow-listing; not applicable to native apps |
 | `configurations[].identifier` | The `configId`. A 24-char hex ObjectId, **not** a human-readable slug |
-| `configurations[].flowType` | `brands` (standard Axeptio flow) or `tcf` (IAB TCF flow) |
+| `configurations[].flowType` | `brands` (standard Axeptio flow) or `tcf` ([IAB TCF flow](tcf.md)) |
 | `configurations[].googleConsentMode` | Back-office Google Consent Mode display settings for this configuration |
 | `configurations[].policyUrl`, `cookieStatementUrl` | Links to show in your UI; may be `null` |
 | `defaultConfigId` | The configuration to use when you have no better signal |
@@ -433,7 +433,7 @@ curl "https://headless-api.axeptio.tech/mobile/client/YOUR_PROJECT_ID/consents/U
   -H "Authorization: Bearer YOUR_API_TOKEN"
 ```
 
-The response carries `accept`, `timestamp`, `_id`, `projectId`, `token`, `collection`, `identifier`, `createdAt`, `headers`, `value` and `preferences`. Note there is **no `consentId`** on the read path — use `_id`. For TCF consents the response also includes a `decoded` object with the parsed TC string.
+The response carries `accept`, `timestamp`, `_id`, `projectId`, `token`, `collection`, `identifier`, `createdAt`, `headers`, `value` and `preferences`. Note there is **no `consentId`** on the read path — use `_id`. For TCF consents the response also includes a `decoded` object with the parsed TC string — see [IAB TCF](tcf.md#read-a-tcf-consent-back).
 
 **Responses:** `200` consent data, `400` missing/invalid parameters, `404` not found, `500` server error
 
@@ -552,12 +552,19 @@ To submit multiple consents, call the single-consent endpoint (`POST /mobile/con
 | `GET` | `/public/geolocation/{projectId}[.js]` | Same resolution, unauthenticated — see [Geolocation](geolocation.md) |
 | `GET` | `/mobile/terms/{projectId}/{configId}` | Terms & Conditions content — see [Terms & Conditions](terms.md) |
 | `GET` | `/mobile/terms/{projectId}/{configId}/pdf` | Terms & Conditions PDF — see [Terms & Conditions](terms.md) |
+| `GET` | `/mobile/tcf/gvl/status` | Latest and cached IAB GVL versions — see [IAB TCF](tcf.md) |
+| `GET` | `/mobile/tcf/configurations/{projectId}/{configId}` | GVL projection for a TCF configuration — see [IAB TCF](tcf.md) |
+| `GET` | `/mobile/tcf/standard-info/{projectId}/{configId}` | TCF first-layer notice — see [IAB TCF](tcf.md) |
+| `GET` | `/mobile/tcf/texts` | TCF UI labels and GVL texts for a locale — see [IAB TCF](tcf.md) |
+| `POST` | `/mobile/tcf/encode` | Build a TC string — see [IAB TCF](tcf.md) |
+| `GET` | `/mobile/tcf/decode` | Parse a TC string (`?tc=`) — see [IAB TCF](tcf.md) |
+| `GET` | `/mobile/tcf/gvl/{latest\|version}[/lang/{lang}]` | Raw IAB GVL and its translations — see [IAB TCF](tcf.md) |
 | `POST` | `/mobile/analytics/evts` | Submit analytics events (requires `X-Mobile-Platform: headless` header) |
 | `GET` | `/mobile/health` | Service health check (Bearer required) |
 
 ### Not covered here yet
 
-The API also exposes an IAB TCF suite (`/mobile/tcf/decode`, `/mobile/tcf/encode`, `/mobile/tcf/configurations/…`, `/mobile/tcf/standard-info/…`, `/mobile/tcf/texts`, `/mobile/tcf/gvl/…`), project statistics (`GET /stats`) and a machine-readable API changelog (`GET /mobile/changelog`). Use the [Swagger UI](https://headless-api.axeptio.tech/mobile/docs) for those until they are documented here.
+The API also exposes project statistics (`GET /stats`) and a machine-readable API changelog (`GET /mobile/changelog`). Use the [Swagger UI](https://headless-api.axeptio.tech/mobile/docs) for those until they are documented here.
 
 ---
 
@@ -569,5 +576,6 @@ The API also exposes an IAB TCF suite (`/mobile/tcf/decode`, `/mobile/tcf/encode
 - [Consent Model](../getting-started/consent-model.md)
 - [Geolocation](geolocation.md)
 - [Terms & Conditions](terms.md)
+- [IAB TCF](tcf.md)
 - [Quick Start](../getting-started/quick-start.md)
 - [React Native Guide](../platform-guides/react-native.md)
