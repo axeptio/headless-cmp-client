@@ -34,7 +34,9 @@ headless-cmp-client/
 ├── docs/
 │   ├── api-reference/
 │   │   ├── overview.md          # Full endpoint catalog, rate limits, error codes
+│   │   ├── changelog.md         # /mobile/changelog, X-Api-Changelog, Deprecation/Sunset headers
 │   │   ├── geolocation.md       # /mobile/geolocation + /public/geolocation
+│   │   ├── stats.md             # GET /stats aggregated consent statistics (BI)
 │   │   └── terms.md             # Terms & Conditions content, PDF, `terms` collection
 │   ├── getting-started/
 │   │   ├── quick-start.md       # 5-minute integration guide

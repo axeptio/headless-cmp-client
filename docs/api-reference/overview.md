@@ -28,7 +28,7 @@ Raw OpenAPI specs:
 | Production | `https://headless-api.axeptio.tech` | Live apps, real consent data |
 | Staging | `https://staging-api.axeptio.tech` | Testing, development, experiments |
 
-The base URL is the host only. Paths on this page are shown in full, including their prefix — most carry `/mobile`, while `/public/geolocation/{projectId}` and `/api/health` do not. Do not append `/mobile` to the base URL.
+The base URL is the host only. Paths on this page are shown in full, including their prefix — most carry `/mobile`, while `/public/geolocation/{projectId}`, `/stats` and `/api/health` do not. Do not append `/mobile` to the base URL.
 
 > **Warning**: You may encounter `https://api.axept.io/v1` in older examples or external guides. This is the wrong URL for the headless API. Always use the URLs above.
 
@@ -43,7 +43,7 @@ Authorization: Bearer YOUR_API_TOKEN
 ```
 
 The only routes that do **not** require authentication are the documentation routes
-(`/mobile/docs`, `/mobile/swagger.json`), `GET /mobile/changelog`,
+(`/mobile/docs`, `/mobile/swagger.json`), [`GET /mobile/changelog`](changelog.md),
 [`GET /public/geolocation/{projectId}`](geolocation.md#public-unauthenticated-geolocation) (and its
 `.js` variant), and `GET /api/health`. `GET /mobile/health` **does** require a token, despite what the spec says.
 
@@ -55,16 +55,17 @@ See [Get your credentials](../getting-started/credentials.md) for how to obtain 
 
 Rate limits are applied per project, based on your tier. When you exceed them, the API returns `429 Too Many Requests` with a `Retry-After` header. Implement exponential backoff in your client.
 
-Every `/mobile/*` response carries the current budget:
+Authenticated responses carry the current budget. The headers are added only once the token has
+been accepted, so a `401` carries none:
 
 | Header | Meaning |
 |--------|---------|
 | `X-RateLimit-Limit` | Requests allowed per minute for your tier |
 | `X-RateLimit-Remaining` | Requests left in the current window |
-| `X-RateLimit-Reset` | When the window resets |
+| `X-RateLimit-Reset` | When the window resets: the next minute boundary, as a Unix timestamp in **milliseconds** (e.g. `1790611200000`), not seconds |
 | `Retry-After` | On `429` only: seconds to wait before retrying |
 
-`GET /public/geolocation/{projectId}` is not rate limited.
+`GET /public/geolocation/{projectId}` and `GET /mobile/changelog` are not rate limited.
 
 ---
 
@@ -554,10 +555,12 @@ To submit multiple consents, call the single-consent endpoint (`POST /mobile/con
 | `GET` | `/mobile/terms/{projectId}/{configId}/pdf` | Terms & Conditions PDF — see [Terms & Conditions](terms.md) |
 | `POST` | `/mobile/analytics/evts` | Submit analytics events (requires `X-Mobile-Platform: headless` header) |
 | `GET` | `/mobile/health` | Service health check (Bearer required) |
+| `GET` | `/mobile/changelog` | Machine-readable API changelog, unauthenticated — see [API Changelog](changelog.md) |
+| `GET` | `/stats` | Aggregated consent statistics for BI tools — see [Statistics](stats.md) |
 
 ### Not covered here yet
 
-The API also exposes an IAB TCF suite (`/mobile/tcf/decode`, `/mobile/tcf/encode`, `/mobile/tcf/configurations/…`, `/mobile/tcf/standard-info/…`, `/mobile/tcf/texts`, `/mobile/tcf/gvl/…`), project statistics (`GET /stats`) and a machine-readable API changelog (`GET /mobile/changelog`). Use the [Swagger UI](https://headless-api.axeptio.tech/mobile/docs) for those until they are documented here.
+The API also exposes an IAB TCF suite (`/mobile/tcf/decode`, `/mobile/tcf/encode`, `/mobile/tcf/configurations/…`, `/mobile/tcf/standard-info/…`, `/mobile/tcf/texts`, `/mobile/tcf/gvl/…`). Use the [Swagger UI](https://headless-api.axeptio.tech/mobile/docs) for it until it is documented here.
 
 ---
 
@@ -569,5 +572,7 @@ The API also exposes an IAB TCF suite (`/mobile/tcf/decode`, `/mobile/tcf/encode
 - [Consent Model](../getting-started/consent-model.md)
 - [Geolocation](geolocation.md)
 - [Terms & Conditions](terms.md)
+- [Statistics](stats.md)
+- [API Changelog](changelog.md)
 - [Quick Start](../getting-started/quick-start.md)
 - [React Native Guide](../platform-guides/react-native.md)
