@@ -262,7 +262,8 @@ When you **submit** consent, the API returns:
 }
 ```
 
-`preferences` may also carry `mobileOptimized` (`compactVendors`, `essentialOnly`), and TCF consents include a top-level `decoded` object with the parsed TC string.
+`preferences` may also carry `mobileOptimized` (`compactVendors`, `essentialOnly`), and TCF consents include a top-level `decoded` object with the parsed TC string (see
+[IAB TCF consents](#iab-tcf-consents)).
 
 ---
 
@@ -300,10 +301,64 @@ GET /mobile/client/{projectId}/consents/{token}?service=terms&identifier={config
 ### IAB TCF consents
 
 Projects whose configuration has `flowType: "tcf"` submit an IAB TCF consent instead: the same
-endpoint, with `preferences.tcString`, `preferences.cmpVersion`, `preferences.gdprApplies` and
-`preferences.version` in the body. Those submissions are validated against a dedicated schema and
-return JSON error bodies rather than plain text. The TCF flow is not covered in this guide yet —
-see the [Swagger UI](https://headless-api.axeptio.tech/mobile/docs) for the full contract.
+endpoint, with the TC string built by [`POST /mobile/tcf/encode`](../api-reference/tcf.md#encode-a-tc-string)
+in `preferences`:
+
+| Field | Description |
+|-------|-------------|
+| `preferences.tcString` | The TC string. Its presence switches on TCF validation |
+| `preferences.cmpVersion` | Your CMP version, `1` or higher — a string encoded with `0` is rejected with `400 invalid_cmp` |
+| `preferences.gdprApplies` | Boolean — whether GDPR applies to this user |
+| `preferences.version` | Number, stored as sent |
+| `preferences.consentFor` | String, stored as sent |
+
+```json
+{
+  "accept": true,
+  "token": "tcfcapad6be0e3cf8ec291",
+  "preferences": {
+    "tcString": "CQrQMwAQrQMwAEEABAENCyFoAOAAAEIAAAqIF5wAgAAgLzAvOACAvMAA.IAAA.YAAAAAAAAAAA",
+    "cmpVersion": 1,
+    "gdprApplies": true,
+    "version": 1,
+    "consentFor": "tcf-capture",
+    "vendors": {}
+  }
+}
+```
+
+These submissions are validated against a dedicated schema and return JSON error bodies (with a
+`details` array on schema failures) rather than plain text.
+
+Reading the consent back returns the stored `preferences` plus a top-level `decoded` block — the
+parsed TC string, identical to the output of
+[`GET /mobile/tcf/decode`](../api-reference/tcf.md#decode-a-tc-string):
+
+```json
+"decoded": {
+  "cmpId": 260,
+  "cmpVersion": 1,
+  "vendorListVersion": 178,
+  "tcfPolicyVersion": 5,
+  "publisherCC": "FR",
+  "consentLanguage": "EN",
+  "created": "2026-09-28T00:00:00.000Z",
+  "lastUpdated": "2026-09-28T00:00:00.000Z",
+  "purposes": { "consents": [1, 2, 3], "legitimateInterests": [2, 7] },
+  "vendors": { "consents": [1, 755], "legitimateInterests": [755] },
+  "specialFeatures": [1],
+  "specialPurposes": [],
+  "publisher": {
+    "consents": [],
+    "legitimateInterests": [],
+    "customConsents": [],
+    "customLegitimateInterests": []
+  }
+}
+```
+
+`cmpId: 260` is an example value. `decoded.vendors` lists IAB vendor ids, not Axeptio vendor
+`name` slugs. See [IAB TCF](../api-reference/tcf.md) for the full flow.
 
 ---
 

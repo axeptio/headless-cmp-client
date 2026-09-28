@@ -135,7 +135,7 @@ curl "https://headless-api.axeptio.tech/public/geolocation/YOUR_PROJECT_ID"
 ```
 
 `flowType` tells you which consent experience to build: `brands` for the standard Axeptio flow,
-`tcf` for the IAB TCF flow.
+`tcf` for the [IAB TCF flow](tcf.md).
 
 ---
 

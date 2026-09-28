@@ -41,13 +41,13 @@ Base URL: `https://headless-api.axeptio.tech`. Paths are shown in full, includin
 | `GET` | `/mobile/geolocation/{projectId}` | Resolve country, regulation and applicable config |
 | `GET` | `/public/geolocation/{projectId}` | Same, unauthenticated (`.js` variant returns a GTM settings snippet) |
 | `GET` | `/mobile/terms/{projectId}/{configId}` | Terms & Conditions content (`/pdf` for the PDF) |
+| `GET`/`POST` | `/mobile/tcf/*` | IAB TCF: GVL, configuration projection, notice, texts, TC string encode/decode |
 | `POST` | `/mobile/analytics/evts` | Submit analytics events (single or batch) |
 | `GET` | `/mobile/health` | Service health (Bearer required; use `GET /api/health` unauthenticated) |
 
 Collections for consent submission: `cookies` · `processings` · `terms` (alias of `contractsV2`)
 
-An IAB TCF suite (`/mobile/tcf/*`), project statistics (`GET /stats`) and an API changelog
-(`GET /mobile/changelog`) are also live; see the Swagger UI above until they are documented here.
+Project statistics (`GET /stats`) and an API changelog (`GET /mobile/changelog`) are also live; see the Swagger UI above until they are documented here.
 
 ---
 
@@ -110,6 +110,7 @@ const consent = await fetch(
 | [API Reference](./docs/api-reference/overview.md) | Full endpoint catalog, rate limits, error codes |
 | [Geolocation](./docs/api-reference/geolocation.md) | Resolve country, regulation and the applicable configuration |
 | [Terms & Conditions](./docs/api-reference/terms.md) | Fetch published terms content or PDF, and record acceptance |
+| [IAB TCF](./docs/api-reference/tcf.md) | GVL, TCF configuration projection, notice texts, TC string encode/decode, TCF consents |
 | [React Native Guide](./docs/platform-guides/react-native.md) | `useConsent` hook, offline queue, Google Consent Mode |
 | [Mobile Integration Reference](./docs/platform-guides/mobile-integration-reference.md) | Comprehensive multi-platform reference (iOS, Android, RN) |
 | [WebView Consent Sharing](./docs/platform-guides/webview-consent-sharing.md) | Share consent into a Custom Tab / WebView via `?axeptio_token=` so the web widget stays hidden |

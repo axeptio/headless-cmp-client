@@ -35,6 +35,7 @@ headless-cmp-client/
 │   ├── api-reference/
 │   │   ├── overview.md          # Full endpoint catalog, rate limits, error codes
 │   │   ├── geolocation.md       # /mobile/geolocation + /public/geolocation
+│   │   ├── tcf.md               # IAB TCF: GVL, projection, texts, encode/decode, TCF consents
 │   │   └── terms.md             # Terms & Conditions content, PDF, `terms` collection
 │   ├── getting-started/
 │   │   ├── quick-start.md       # 5-minute integration guide
